@@ -45,6 +45,11 @@ npm run dev
 
 Open http://localhost:5173. The dev server proxies `/api` to port 8000.
 
+## Deploying
+
+See [deploy/README.md](deploy/README.md): the backend goes to a Linux server as its own service,
+and the frontend is built into a folder of the website (e.g. `/hvac/`).
+
 ## Tests
 
 ```bash

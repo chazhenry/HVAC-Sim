@@ -20,15 +20,21 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Where the API lives. Same-origin `/api` in development (Vite proxies it); a
+ * production build can point at another host with VITE_API_BASE.
+ */
+const API_BASE = (import.meta.env.VITE_API_BASE ?? '/api').replace(/\/+$/, '');
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(`${API_BASE}${path}`, {
       ...init,
       headers: { 'Content-Type': 'application/json', ...init?.headers },
     });
   } catch {
-    throw new ApiError('Cannot reach the HVAC-Sim API. Is the backend running on port 8000?', 0);
+    throw new ApiError('Cannot reach the HVAC-Sim API. Is the backend running?', 0);
   }
   if (!res.ok) {
     let detail = res.statusText;

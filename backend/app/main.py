@@ -38,6 +38,13 @@ from .scenarios import DIAGNOSES, DIAGNOSIS_BY_ID, SCENARIO_BY_ID, SCENARIOS, Sc
 from .store import SessionRow, SessionStore
 
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "hvac_sim.db"
+DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+
+def allowed_origins() -> list[str]:
+    """Browser origins allowed to call the API: local dev plus HVAC_SIM_CORS_ORIGINS (comma separated)."""
+    extra = os.environ.get("HVAC_SIM_CORS_ORIGINS", "")
+    return DEV_ORIGINS + [o.strip().rstrip("/") for o in extra.split(",") if o.strip()]
 
 
 class HistoryEntry(ApiModel):
@@ -54,7 +61,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=allowed_origins(),
         allow_methods=["*"],
         allow_headers=["*"],
     )

@@ -1,0 +1,23 @@
+[Unit]
+Description=HVAC-Sim API (FastAPI)
+After=network.target
+
+[Service]
+User=__NAME__
+Group=__NAME__
+WorkingDirectory=/opt/__NAME__/current
+Environment=HVAC_SIM_DB=/var/lib/__NAME__/hvac_sim.db
+Environment=HVAC_SIM_CORS_ORIGINS=__ORIGINS__
+ExecStart=/opt/__NAME__/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port __PORT__
+Restart=on-failure
+RestartSec=3
+
+# Keep the service boxed in: it can only write its own data folder.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/__NAME__
+
+[Install]
+WantedBy=multi-user.target

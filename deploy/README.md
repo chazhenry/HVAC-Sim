@@ -34,6 +34,14 @@ Check it with `curl https://<API_DOMAIN>/api/health`.
 
 ## Every update
 
+To deploy the backend and then publish the frontend source in one command (stops if the backend fails):
+
+```bash
+bash deploy/deploy-both.sh "what changed"
+```
+
+Or run the deploys separately:
+
 ```bash
 bash deploy/deploy-backend.sh                  # only when backend/ changed
 bash deploy/deploy-frontend.sh "what changed"  # commit, push, then print the website steps

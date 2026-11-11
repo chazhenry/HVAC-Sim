@@ -1,5 +1,7 @@
 # HVAC-Sim
 
+![HVAC-Sim: the condenser's control box open, with the tool bag on the left and the thermostat calling for cooling](docs/screenshot.png)
+
 Interactive 3D trainer for troubleshooting residential HVAC equipment. Two units so far:
 
 - **A/C condenser** - split system, R-410A (`frontend/src/sim`, `backend/app/scenarios.py`)

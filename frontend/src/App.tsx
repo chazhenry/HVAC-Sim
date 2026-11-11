@@ -5,12 +5,14 @@ import { Scene, useView } from './scene/Scene';
 import { useSim } from './store/useSim';
 import { Menu, ResultDialog, SubmitDialog } from './ui/Dialogs';
 import { JobPanel } from './ui/JobPanel';
+import { JobLogToasts } from './ui/JobLogToasts';
 import { Splitter, usePaneWidth } from './ui/Splitter';
 import { StatusBar } from './ui/StatusBar';
 import { ThermostatWidget } from './ui/Thermostat';
 import { Toolbox } from './ui/Toolbox';
 import { toolCursor } from './ui/toolIcons';
 import { WiringDiagram } from './ui/WiringDiagram';
+import { APP_VERSION } from './version';
 
 const TICK_SECONDS = 0.1;
 
@@ -24,7 +26,7 @@ function TopBar({ onSubmit, onDiagram }: { onSubmit: () => void; onDiagram: () =
   const exhausted = hintsTotal > 0 && hints >= hintsTotal;
   return (
     <header className="topbar">
-      <strong className="brand">HVAC-Sim</strong>
+      <strong className="brand">HVAC-Sim <span className="app-version">(v{APP_VERSION})</span></strong>
       <nav className="views" aria-label="Camera views">
         {views.map((view) => (
           <button key={view.label} type="button" onClick={() => go(view)}>
@@ -107,6 +109,7 @@ export function App(): ReactNode {
       {(phase === 'menu' || phase === 'loading') && <Menu />}
       {phase === 'running' && submitting && <SubmitDialog onClose={() => setSubmitting(false)} />}
       {phase === 'graded' && <ResultDialog />}
+      <JobLogToasts />
     </div>
   );
 }

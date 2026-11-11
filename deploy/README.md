@@ -39,7 +39,10 @@ bash deploy/deploy-backend.sh                  # only when backend/ changed
 bash deploy/deploy-frontend.sh "what changed"  # commit, push, then print the website steps
 ```
 
-`deploy-frontend.sh` commits everything in this repo with that comment and pushes it. It then
+`deploy-frontend.sh` first updates `frontend/src/version.ts` to the deploying machine's local
+date (`YY.MM.DD`). Additional deploys on the same date use `a`, `b`, through `z`, then `aa`,
+`ab`, and so on. The version appears beside HVAC-Sim in the menu and job header.
+The script commits the version and everything else in this repo with that comment and pushes it. It then
 prints the three commands to run in the website repo, which rebuilds `public/hvac/` from GitHub
 and publishes the site. The website's deploy uploads the whole site each time, which is why the
 last step has to happen there.

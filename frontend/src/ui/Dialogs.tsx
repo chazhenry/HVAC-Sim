@@ -3,6 +3,7 @@ import type { Difficulty, UnitType } from '../api/types';
 import type { ExamSection } from '../api/types';
 import { useSim } from '../store/useSim';
 import { Exam, ExamSections } from './Exam';
+import { APP_VERSION } from '../version';
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   intro: 'Intro',
@@ -27,7 +28,7 @@ export function Menu(): ReactNode {
   return (
     <div className="overlay">
       <div className="dialog wide">
-        <h1>HVAC-Sim</h1>
+        <h1>HVAC-Sim <span className="app-version">(v{APP_VERSION})</span></h1>
         <p className="lede">
           Pick a service call, find the fault with real instruments, make the repair and prove the
           equipment runs.

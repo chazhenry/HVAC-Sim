@@ -4,7 +4,7 @@
 #
 #   bash deploy/deploy-frontend.sh "version comment"
 #
-# Commits everything in this repo with that comment and pushes it to GitHub,
+# Bumps the app version, commits everything with that comment and pushes to GitHub,
 # then prints what to run in the website repo, which builds the frontend from
 # GitHub and puts it live at /hvac/.
 ###############################################################################
@@ -17,6 +17,36 @@ fi
 COMMENT="$1"
 
 cd "$(dirname "$0")/.."
+
+# Use this machine's local date. Same-day releases advance a, b, ... z, aa, ab, ...
+VERSION_FILE="frontend/src/version.ts"
+TODAY="$(date +%y.%m.%d)"
+CURRENT="$(sed -nE "s/^export const APP_VERSION = '([0-9]{2}\\.[0-9]{2}\\.[0-9]{2}[a-z]*)';\r?$/\1/p" "$VERSION_FILE")"
+if [ -z "$CURRENT" ]; then
+    echo "Cannot read APP_VERSION from $VERSION_FILE. Nothing was committed."
+    exit 1
+fi
+
+VERSION="$TODAY"
+if [[ "$CURRENT" == "$TODAY"* ]]; then
+    SUFFIX="${CURRENT#"$TODAY"}"
+    CARRY=""
+    while [[ "$SUFFIX" == *z ]]; do
+        SUFFIX="${SUFFIX%z}"
+        CARRY="a$CARRY"
+    done
+    if [ -z "$SUFFIX" ]; then
+        SUFFIX="a$CARRY"
+    else
+        ALPHABET="abcdefghijklmnopqrstuvwxyz"
+        LAST="${SUFFIX: -1}"
+        FOLLOWING="${ALPHABET#*"$LAST"}"
+        SUFFIX="${SUFFIX%?}${FOLLOWING:0:1}$CARRY"
+    fi
+    VERSION="$TODAY$SUFFIX"
+fi
+printf "/** Release date (YY.MM.DD), followed by a letter for additional releases that day. */\nexport const APP_VERSION = '%s';\n" "$VERSION" > "$VERSION_FILE"
+echo "App version: $CURRENT -> $VERSION"
 
 git add -A
 

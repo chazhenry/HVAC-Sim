@@ -1,131 +1,87 @@
-import { type ReactNode, useEffect, useRef } from 'react';
-import { boardPowered, FAULT_CODES } from '../sim/furnace/engine';
+import { type ReactNode, useState } from 'react';
 import { useSim } from '../store/useSim';
-import { Instruments } from './Instruments';
+import { ChatPanel } from './ChatPanel';
+import { Instruments, useInstrumentNames } from './Instruments';
 
-function FurnaceObservations(): ReactNode {
-  const powered = useSim((s) => (s.furnace ? boardPowered(s.furnace) : false));
-  const code = useSim((s) => s.furnace?.board.code ?? 0);
-  const inducer = useSim((s) => (s.furnace?.inducerSpeed ?? 0) > 0.4);
-  const glow = useSim((s) => (s.furnace?.igniterTemp ?? 0) > 0.6);
-  const flame = useSim((s) => s.furnace?.flame ?? false);
-  const blower = useSim((s) => s.furnace?.blower ?? 'off');
-  const blowing = useSim((s) => (s.furnace?.blowerSpeed ?? 0) > 0.4);
-  const rows: Array<[string, string]> = [
-    ['Board LED', powered ? FAULT_CODES[code] : 'off - no power at the board'],
-    ['Inducer', inducer ? 'running' : 'stopped'],
-    ['Igniter', glow ? 'glowing orange' : 'dark'],
-    ['Burners', flame ? 'lit, blue flame' : 'no flame'],
-    ['Blower', blowing ? 'moving air' : blower === 'locked' ? 'humming, not turning' : 'stopped'],
-  ];
+/**
+ * A card whose body folds away behind a chevron. `summary` stays visible when
+ * it is collapsed. The open/closed choice is remembered per card in the browser.
+ */
+function CollapsibleCard(props: {
+  id: string;
+  title: string;
+  /** Shown after the title in the accent colour, e.g. what the card currently holds. */
+  detail?: string;
+  summary?: ReactNode;
+  children: ReactNode;
+}): ReactNode {
+  const { id, title, detail, summary, children } = props;
+  const key = `hvac-sim.card.${id}`;
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(key) !== 'closed';
+    } catch {
+      return true;
+    }
+  });
+  const toggle = (): void => {
+    const next = !open;
+    setOpen(next);
+    try {
+      window.localStorage.setItem(key, next ? 'open' : 'closed');
+    } catch {
+      // Storage can be blocked; the choice then lasts for this visit only.
+    }
+  };
   return (
-    <dl className="kv">
-      {rows.map(([k, v]) => (
-        <div key={k} className="kv-row">
-          <dt>{k}</dt>
-          <dd>{v}</dd>
+    <section className="card">
+      <button
+        type="button"
+        className="card-toggle"
+        aria-expanded={open}
+        aria-controls={`card-${id}`}
+        title={`${open ? 'Collapse' : 'Expand'} ${title.toLowerCase()}`}
+        onClick={toggle}
+      >
+        <h2>
+          {title}
+          {detail && (
+            <>
+              : <span className="card-detail">{detail}</span>
+            </>
+          )}
+        </h2>
+        <svg className={open ? 'chev open' : 'chev'} viewBox="0 0 16 16" width={14} height={14} aria-hidden="true">
+          <path d="M3 6 L8 11 L13 6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {summary}
+      {open && (
+        <div id={`card-${id}`} className="card-body">
+          {children}
         </div>
-      ))}
-    </dl>
+      )}
+    </section>
   );
 }
 
-function Observations(): ReactNode {
-  const fan = useSim((s) => s.sim?.fan ?? 'off');
-  const spinning = useSim((s) => (s.sim?.fanSpeed ?? 0) > 0.4);
-  const compressor = useSim((s) => s.sim?.compressor ?? 'off');
-  const suctionCold = useSim((s) => (s.sim?.thermo.suctionLineF ?? 99) < 62);
-  const power = useSim((s) => s.sim?.controls.disconnectIn ?? true);
-  const rows: Array<[string, string]> = [
-    ['Disconnect', power ? 'in' : 'pulled'],
-    ['Condenser fan', spinning ? 'spinning' : fan === 'locked' ? 'buzzing, not turning' : 'stopped'],
-    [
-      'Compressor',
-      compressor === 'running' ? 'running' : compressor === 'locked' ? 'loud hum, not running' : 'silent',
-    ],
-    ['Suction line', suctionCold ? 'cold to the touch' : 'not cold'],
-  ];
-  return (
-    <dl className="kv">
-      {rows.map(([k, v]) => (
-        <div key={k} className="kv-row">
-          <dt>{k}</dt>
-          <dd>{v}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function Log(): ReactNode {
-  const log = useSim((s) => s.log);
-  const end = useRef<HTMLLIElement>(null);
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: 'nearest' });
-  }, [log.length]);
-  return (
-    <ol className="log" aria-live="polite">
-      {log.map((entry) => (
-        <li key={entry.id} className={`log-${entry.kind}`}>
-          <time>{`${Math.floor(entry.t / 60)}:${String(Math.floor(entry.t % 60)).padStart(2, '0')}`}</time>
-          {entry.text}
-        </li>
-      ))}
-      <li ref={end} />
-    </ol>
-  );
-}
-
+/** Right-hand pane: the work order and instrument readouts, with the chat filling the rest. */
 export function JobPanel(): ReactNode {
   const scenario = useSim((s) => s.scenario);
-  const isFurnace = useSim((s) => s.unitType === 'furnace');
-  const tstat = useSim((s) => s.tstat);
-  const env = useSim((s) => (s.sim ?? s.furnace)?.env);
-  const setThermostat = useSim((s) => s.setThermostat);
-  if (!scenario || !env) return null;
+  const instruments = useInstrumentNames().join(', ');
+  if (!scenario) return null;
   return (
     <aside className="jobpanel">
-      <section className="card">
-        <h2>Work order</h2>
-        <h3 className="job-title">{scenario.title}</h3>
-        <p className="complaint">{scenario.complaint}</p>
-      </section>
+      <div className="jobpanel-top">
+        <CollapsibleCard id="work-order" title="Work order" summary={<h3 className="job-title">{scenario.title}</h3>}>
+          <p className="complaint">{scenario.complaint}</p>
+        </CollapsibleCard>
 
-      <section className="card thermostat">
-        <div>
-          <h2>Thermostat</h2>
-          <p className="fine">
-            Indoor {env.indoorF.toFixed(0)} °F · set {tstat.setpointF} °F · outdoor {env.outdoorF.toFixed(0)} °F
-          </p>
-        </div>
-        <div className="seg" role="group" aria-label="Thermostat mode">
-          <button type="button" className={tstat.mode === 'off' ? 'on' : ''} onClick={() => setThermostat({ mode: 'off' })}>
-            Off
-          </button>
-          <button
-            type="button"
-            className={tstat.mode !== 'off' ? (isFurnace ? 'on heat' : 'on cool') : ''}
-            onClick={() => setThermostat({ mode: isFurnace ? 'heat' : 'cool' })}
-          >
-            {isFurnace ? 'Heat' : 'Cool'}
-          </button>
-        </div>
-      </section>
-
-      <section className="card">
-        <h2>Instruments</h2>
-        <Instruments />
-      </section>
-
-      <section className="card">
-        <h2>What you see and hear</h2>
-        {isFurnace ? <FurnaceObservations /> : <Observations />}
-      </section>
-
-      <section className="card grow">
-        <h2>Job log</h2>
-        <Log />
-      </section>
+        <CollapsibleCard id="instruments" title="Instruments" {...(instruments ? { detail: instruments } : {})}>
+          <Instruments />
+        </CollapsibleCard>
+      </div>
+      <ChatPanel />
     </aside>
   );
 }

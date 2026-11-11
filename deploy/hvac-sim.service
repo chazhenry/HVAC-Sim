@@ -8,6 +8,8 @@ Group=__NAME__
 WorkingDirectory=/opt/__NAME__/current
 Environment=HVAC_SIM_DB=/var/lib/__NAME__/hvac_sim.db
 Environment=HVAC_SIM_CORS_ORIGINS=__ORIGINS__
+# LLM API keys for the chat tutor; installed from backend/.env by the deploy script.
+EnvironmentFile=-/etc/__NAME__.env
 ExecStart=/opt/__NAME__/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port __PORT__
 Restart=on-failure
 RestartSec=3

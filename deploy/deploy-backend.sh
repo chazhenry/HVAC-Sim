@@ -46,9 +46,18 @@ echo "  uploading"
 scp -q "${SSH_OPTS[@]}" "$BUNDLE" "${TARGET}:/tmp/hvac-sim-bundle.tgz"
 scp -q "${SSH_OPTS[@]}" deploy/remote-install.sh "${TARGET}:/tmp/hvac-sim-install.sh"
 
+REMOTE_ENV=""
+if [ -f backend/.env ]; then
+    echo "  uploading API keys (backend/.env)"
+    REMOTE_ENV="/tmp/hvac-sim-env.$$"
+    ssh "${SSH_OPTS[@]}" "$TARGET" "umask 077; cat > '$REMOTE_ENV'" < <(sed 's/\r$//' backend/.env)
+else
+    echo "  no backend/.env - the chat tutor will be disabled on the server"
+fi
+
 echo "  installing"
 ssh "${SSH_OPTS[@]}" "$TARGET" \
-    "sudo bash /tmp/hvac-sim-install.sh '$APP_PORT' '$API_DOMAIN' '$SITE_ORIGINS' /tmp/hvac-sim-bundle.tgz '$SERVICE_NAME'; rc=\$?; rm -f /tmp/hvac-sim-install.sh; exit \$rc"
+    "sudo bash /tmp/hvac-sim-install.sh '$APP_PORT' '$API_DOMAIN' '$SITE_ORIGINS' /tmp/hvac-sim-bundle.tgz '$SERVICE_NAME' '$REMOTE_ENV'; rc=\$?; rm -f /tmp/hvac-sim-install.sh; exit \$rc"
 
 echo ""
 echo "Backend deployed. Checking https://${API_DOMAIN}/api/health ..."

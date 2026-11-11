@@ -13,7 +13,7 @@ import {
   TOP_Y,
   WIRES,
 } from './layout';
-import { interactive, LouverWall, makeFinTexture, makeTextTexture, Movable, solid, TestPoint, Tube, Wire } from './parts';
+import { interactive, LouverWall, makeFinTexture, makeTextTexture, Movable, named, smoothCurve, solid, TestPoint, Tube, Wire } from './parts';
 
 const CABINET = '#c4c7c2';
 const GALV = '#9aa1a5';
@@ -89,7 +89,7 @@ function FanHarness({ motorEnd }: { motorEnd: RefObject<THREE.Object3D | null> }
     last.current.copy(tip);
     // Slack loop: leaves the motor sideways, droops, then drops into the box.
     const droop = tip.clone().lerp(HARNESS_ANCHOR, 0.5).add(new THREE.Vector3(0.05, -0.05, 0.02));
-    const curve = new THREE.CatmullRomCurve3([
+    const curve = smoothCurve([
       tip.clone(),
       tip.clone().add(new THREE.Vector3(0.06, -0.02, 0.02)),
       droop,
@@ -97,10 +97,10 @@ function FanHarness({ motorEnd }: { motorEnd: RefObject<THREE.Object3D | null> }
       HARNESS_ANCHOR,
     ]);
     mesh.current.geometry.dispose();
-    mesh.current.geometry = new THREE.TubeGeometry(curve, 40, 0.008, 8, false);
+    mesh.current.geometry = new THREE.TubeGeometry(curve, 72, 0.008, 12, false);
   });
   return (
-    <mesh ref={mesh} castShadow>
+    <mesh ref={mesh} castShadow {...named('Fan motor wiring harness')}>
       <bufferGeometry />
       <meshStandardMaterial color="#2c2c2e" roughness={0.7} />
     </mesh>
@@ -384,19 +384,19 @@ function ServiceValves(): ReactNode {
         handlers={interactive('Liquid line', () => useSim.getState().clickPipe('liquid'))}
       />
       {clamps.suction && (
-        <mesh position={[0.62, SUCTION_VALVE[1], 0.15]}>
+        <mesh position={[0.62, SUCTION_VALVE[1], 0.15]} {...named('Temperature clamp on the suction line')}>
           <boxGeometry args={[0.035, 0.06, 0.06]} />
           <meshStandardMaterial color="#f2c200" roughness={0.5} />
         </mesh>
       )}
       {clamps.liquid && (
-        <mesh position={[0.62, LIQUID_VALVE[1], 0.15]}>
+        <mesh position={[0.62, LIQUID_VALVE[1], 0.15]} {...named('Temperature clamp on the liquid line')}>
           <boxGeometry args={[0.035, 0.04, 0.04]} />
           <meshStandardMaterial color="#f2c200" roughness={0.5} />
         </mesh>
       )}
       {showManifold && (
-        <group position={[mx, my, mz]} rotation={[-0.5, -0.5, 0]}>
+        <group position={[mx, my, mz]} rotation={[-0.5, -0.5, 0]} {...named('Manifold gauge set - R-410A (blue = low side, red = high side)')}>
           <mesh castShadow>
             <boxGeometry args={[0.2, 0.05, 0.04]} />
             <meshStandardMaterial color="#8a8f95" metalness={0.7} roughness={0.35} />
@@ -414,6 +414,7 @@ function ServiceValves(): ReactNode {
           points={[[SUCTION_VALVE[0], SUCTION_VALVE[1], 0.21], [0.55, 0.2, 0.42], [0.8, 0.04, 0.5], [mx - 0.06, my - 0.02, mz]]}
           radius={0.007}
           color="#1f5fbf"
+          handlers={named('Blue hose - manifold low side to the suction service port')}
         />
       )}
       {gauges.high && (
@@ -421,10 +422,11 @@ function ServiceValves(): ReactNode {
           points={[[LIQUID_VALVE[0], LIQUID_VALVE[1], 0.21], [0.6, 0.1, 0.36], [0.86, 0.03, 0.44], [mx + 0.04, my - 0.02, mz]]}
           radius={0.007}
           color="#c62828"
+          handlers={named('Red hose - manifold high side to the liquid service port')}
         />
       )}
       {/* Liquid line filter drier */}
-      <mesh position={[0.56, LIQUID_VALVE[1], 0.15]} rotation={[0, 0, Math.PI / 2]} castShadow>
+      <mesh position={[0.56, LIQUID_VALVE[1], 0.15]} rotation={[0, 0, Math.PI / 2]} castShadow {...named('Liquid line filter drier')}>
         <cylinderGeometry args={[0.02, 0.02, 0.07, 16]} />
         <meshStandardMaterial color="#2f6fb0" metalness={0.6} roughness={0.4} />
       </mesh>
@@ -442,9 +444,9 @@ function ServiceEquipment(): ReactNode {
   const glow = running ? '#1d4d1d' : '#000000';
   return (
     <group>
-      <Tube points={[[mx, my - 0.02, mz], [1.1, 0.03, 0.62], [1.2, 0.05, 0.78], [1.28, 0.14, 0.86]]} radius={0.007} color="#e6c200" />
+      <Tube points={[[mx, my - 0.02, mz], [1.1, 0.03, 0.62], [1.2, 0.05, 0.78], [1.28, 0.14, 0.86]]} radius={0.007} color="#e6c200" handlers={named('Yellow hose - manifold centre port to the service equipment')} />
       {hose === 'recovery' && (
-        <>
+        <group {...named('Recovery machine and recovery cylinder on a scale')}>
           <mesh position={[1.36, 0.12, 0.9]} castShadow>
             <boxGeometry args={[0.32, 0.24, 0.22]} />
             <meshStandardMaterial color="#35557a" emissive={glow} roughness={0.6} />
@@ -461,10 +463,10 @@ function ServiceEquipment(): ReactNode {
             <boxGeometry args={[0.26, 0.03, 0.26]} />
             <meshStandardMaterial color="#22252a" roughness={0.7} />
           </mesh>
-        </>
+        </group>
       )}
       {hose === 'nitrogen' && (
-        <>
+        <group {...named('Nitrogen cylinder with regulator')}>
           <mesh position={[1.36, 0.45, 0.9]} castShadow>
             <cylinderGeometry args={[0.09, 0.09, 0.9, 24]} />
             <meshStandardMaterial color="#2c3136" metalness={0.5} roughness={0.5} />
@@ -473,10 +475,10 @@ function ServiceEquipment(): ReactNode {
             <boxGeometry args={[0.1, 0.07, 0.06]} />
             <meshStandardMaterial color="#b08d3c" metalness={0.8} roughness={0.35} />
           </mesh>
-        </>
+        </group>
       )}
       {hose === 'vacuum' && (
-        <>
+        <group {...named('Vacuum pump with micron gauge')}>
           <mesh position={[1.36, 0.08, 0.9]} castShadow>
             <boxGeometry args={[0.16, 0.14, 0.14]} />
             <meshStandardMaterial color="#b3261e" emissive={glow} roughness={0.5} />
@@ -485,10 +487,10 @@ function ServiceEquipment(): ReactNode {
             <cylinderGeometry args={[0.06, 0.06, 0.16, 20]} />
             <meshStandardMaterial color="#2d3035" metalness={0.5} roughness={0.5} />
           </mesh>
-        </>
+        </group>
       )}
       {hose === 'cylinder' && (
-        <>
+        <group {...named('R-410A cylinder on a charging scale')}>
           <mesh position={[1.36, 0.015, 0.9]}>
             <boxGeometry args={[0.28, 0.03, 0.28]} />
             <meshStandardMaterial color="#22252a" roughness={0.7} />
@@ -497,7 +499,7 @@ function ServiceEquipment(): ReactNode {
             <cylinderGeometry args={[0.11, 0.11, 0.34, 24]} />
             <meshStandardMaterial color="#e39ab0" emissive={glow} roughness={0.5} />
           </mesh>
-        </>
+        </group>
       )}
     </group>
   );

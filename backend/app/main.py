@@ -24,6 +24,7 @@ from .exam import (
     paper,
     section_info,
 )
+from . import llm
 from .grading import grade
 from .models import (
     ApiModel,
@@ -36,6 +37,7 @@ from .models import (
 )
 from .scenarios import DIAGNOSES, DIAGNOSIS_BY_ID, SCENARIO_BY_ID, SCENARIOS, Scenario
 from .store import SessionRow, SessionStore
+from .tutor import ChatRequest, ChatResponse, UsageLimiter, build_messages
 
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "hvac_sim.db"
 DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -56,7 +58,9 @@ class HistoryEntry(ApiModel):
 
 
 def create_app(db_path: Path | str | None = None) -> FastAPI:
+    llm.load_env_file()
     app = FastAPI(title="HVAC-Sim API", version="0.1.0")
+    limiter = UsageLimiter()
     store = SessionStore(db_path or os.environ.get("HVAC_SIM_DB", DEFAULT_DB))
 
     app.add_middleware(
@@ -118,6 +122,19 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         result = grade(scenario, body, row.hints_used)
         store.finish(session_id, result.score, result.model_dump_json(by_alias=True))
         return result
+
+    @app.post("/api/sessions/{session_id}/chat", response_model=ChatResponse)
+    async def chat(session_id: str, body: ChatRequest) -> ChatResponse:
+        _, scenario = load(session_id)
+        if (refusal := limiter.check(session_id)) is not None:
+            raise HTTPException(status_code=429, detail=refusal)
+        try:
+            reply, provider = await llm.complete(build_messages(scenario, body))
+        except llm.LlmNotConfigured as e:
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        except llm.LlmError as e:
+            raise HTTPException(status_code=502, detail="The tutor could not be reached. Try again.") from e
+        return ChatResponse(reply=reply, provider=provider)
 
     @app.get("/api/exam", response_model=list[SectionInfo])
     def exam_sections() -> list[SectionInfo]:

@@ -87,6 +87,14 @@ The **thermostat** sits in the top-left corner of the 3D view (`frontend/src/ui/
 a standard digital face or a round smart face over the same state, set through one shared dialog.
 It calls only when its mode is on and the room is past the setpoint; the room temperature is fixed.
 
+**Chat tutor.** The right-hand pane has a Chat tab backed by `POST /api/sessions/{id}/chat`
+(`backend/app/tutor.py`, `backend/app/llm.py`). The backend calls DeepSeek, falling back to OpenAI;
+keys come from `backend/.env` (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`; model names from
+`DEEPSEEK_FLASH` / `HVAC_SIM_OPENAI_MODEL`). Each prompt carries a snapshot of what the learner
+can see and has measured (`frontend/src/ui/observations.ts`). The tutor is never given the answer
+key or the unit's hidden parameters, so it coaches from the readings and cannot leak the fault.
+Usage is capped per job and per minute.
+
 ## Adding a scenario
 
 Add a `Scenario` to `backend/app/scenarios.py`: override the `UnitParams` fields that describe

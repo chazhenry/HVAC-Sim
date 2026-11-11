@@ -1,5 +1,7 @@
 import type {
   CatalogResponse,
+  ChatRequest,
+  ChatResponse,
   ExamPaper,
   ExamResult,
   ExamSection,
@@ -58,6 +60,8 @@ export const api = {
   catalog: () => request<CatalogResponse>('/catalog'),
   startSession: (scenarioId: string) => request<SessionResponse>('/sessions', post({ scenarioId })),
   hint: (sessionId: string) => request<HintResponse>(`/sessions/${sessionId}/hint`, post()),
+  chat: (sessionId: string, body: ChatRequest) =>
+    request<ChatResponse>(`/sessions/${sessionId}/chat`, post(body)),
   examSections: () => request<ExamSectionInfo[]>('/exam'),
   examPaper: (section: ExamSection) => request<ExamPaper>(`/exam/${section}`),
   gradeExam: (section: ExamSection, answers: Record<string, number>) =>

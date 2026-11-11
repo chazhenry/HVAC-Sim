@@ -8,6 +8,7 @@
 #   /etc/systemd/system/<name>.service
 #   /etc/nginx/sites-available/<name>  (+ the sites-enabled link)
 #   system user <name>
+#   /etc/<name>.env                    API keys for the chat tutor (if backend/.env exists)
 # where <name> is SERVICE_NAME from deploy.env.
 # It never edits another service, venv or nginx site.
 ###############################################################################
@@ -18,6 +19,7 @@ DOMAIN="$2"
 ORIGINS="$3"
 BUNDLE="$4"
 NAME="$5"
+SECRETS="${6:-}"
 
 [[ "$NAME" =~ ^[a-z][a-z0-9_-]{1,30}$ ]] || { echo "bad service name: $NAME" >&2; exit 1; }
 
@@ -78,6 +80,13 @@ mv "$APP/incoming" "$APP/current"
 chown -R root:root "$APP"
 chmod -R a+rX "$APP"
 chown -R "$NAME:$NAME" "$DATA"
+
+# API keys for the chat tutor: readable by root and the service user only.
+if [ -n "$SECRETS" ] && [ -f "$SECRETS" ]; then
+    install -m 640 -o root -g "$NAME" "$SECRETS" "/etc/$NAME.env"
+    rm -f "$SECRETS"
+    say "installed API keys to /etc/$NAME.env"
+fi
 
 sed -e "s|__NAME__|${NAME}|g" -e "s|__PORT__|${PORT}|g" -e "s|__ORIGINS__|${ORIGINS}|g" "$APP/current/hvac-sim.service" > "$UNIT"
 systemctl daemon-reload

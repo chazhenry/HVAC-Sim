@@ -35,15 +35,17 @@ Check it with `curl https://<API_DOMAIN>/api/health`.
 ## Every update
 
 ```bash
-bash deploy/deploy-backend.sh     # only when backend/ changed
-bash deploy/publish-frontend.sh   # only when frontend/ changed
+bash deploy/deploy-backend.sh                  # only when backend/ changed
+bash deploy/deploy-frontend.sh "what changed"  # commit, push, then print the website steps
 ```
 
-`publish-frontend.sh` builds the frontend for `SITE_PATH` and copies it into
-`<HOMEPAGE_REPO>/public/hvac/`. It stops there: commit that folder in the
-website repo and run the website's own deploy to put it live. The website's
-deploy uploads the whole site each time, which is why the files have to be part
-of it.
+`deploy-frontend.sh` commits everything in this repo with that comment and pushes it. It then
+prints the three commands to run in the website repo, which rebuilds `public/hvac/` from GitHub
+and publishes the site. The website's deploy uploads the whole site each time, which is why the
+last step has to happen there.
+
+`publish-frontend.sh` is the alternative for when the website repo is checked out on the same
+machine: it builds the frontend and copies it straight into `<HOMEPAGE_REPO>/public/hvac/`.
 
 ## What the backend deploy touches on the server
 
@@ -55,6 +57,8 @@ and the user to match):
 - `/etc/systemd/system/hvac-sim.service` - runs as system user `hvac-sim`,
   listening on `127.0.0.1:<APP_PORT>` only
 - `/etc/nginx/sites-available/hvac-sim` - a separate nginx site for `API_DOMAIN`
+- `/etc/hvac-sim.env` - the chat tutor's API keys, copied from your local `backend/.env` over SSH
+  (mode 640, never in git). Without that file the API runs but the chat answers "not configured".
 
 It refuses to continue if the port is in use, the service name is already taken, or another
 nginx site already serves the hostname, and it removes its nginx file again if `nginx -t` fails.

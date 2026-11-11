@@ -5,6 +5,8 @@ import { Scene, useView } from './scene/Scene';
 import { useSim } from './store/useSim';
 import { Menu, ResultDialog, SubmitDialog } from './ui/Dialogs';
 import { JobPanel } from './ui/JobPanel';
+import { Splitter, usePaneWidth } from './ui/Splitter';
+import { StatusBar } from './ui/StatusBar';
 import { ThermostatWidget } from './ui/Thermostat';
 import { Toolbox } from './ui/Toolbox';
 import { toolCursor } from './ui/toolIcons';
@@ -64,6 +66,7 @@ export function App(): ReactNode {
   const sessionId = useSim((s) => s.sessionId);
   const [submitting, setSubmitting] = useState(false);
   const [diagram, setDiagram] = useState(false);
+  const pane = usePaneWidth();
 
   // Frame the right piece of equipment whenever a new job starts.
   useEffect(() => {
@@ -89,14 +92,16 @@ export function App(): ReactNode {
   return (
     <div className="app">
       {inJob && <TopBar onSubmit={() => setSubmitting(true)} onDiagram={() => setDiagram((v) => !v)} />}
-      <main className="stage">
+      <main className="stage" style={inJob ? pane.style : undefined}>
         {inJob && <Toolbox />}
         <div className="viewport" style={inJob ? { cursor: toolCursor(tool) } : undefined}>
           <Scene />
           {inJob && <HoverBar />}
+          {inJob && <StatusBar />}
           {inJob && <ThermostatWidget />}
           {inJob && diagram && <WiringDiagram onClose={() => setDiagram(false)} />}
         </div>
+        {inJob && <Splitter width={pane.width} onChange={pane.set} />}
         {inJob && <JobPanel />}
       </main>
       {(phase === 'menu' || phase === 'loading') && <Menu />}

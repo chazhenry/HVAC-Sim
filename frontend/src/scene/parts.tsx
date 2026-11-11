@@ -38,6 +38,17 @@ export function interactive(label: string, onActivate: () => void): PointerHandl
   };
 }
 
+/** Hover label for something that is only there to be recognised, such as a tool set down by the unit. */
+export const named = (label: string): PointerHandlers => interactive(label, () => undefined);
+
+/**
+ * A smooth path through the given points. Centripetal parameterisation cannot
+ * form the cusps and loops that uniform Catmull-Rom makes where points are
+ * unevenly spaced, which is what showed up as kinks in wires and hoses.
+ */
+export const smoothCurve = (points: readonly THREE.Vector3[]): THREE.CatmullRomCurve3 =>
+  new THREE.CatmullRomCurve3([...points], false, 'centripetal');
+
 /** Blocks clicks from reaching whatever is behind a solid piece of sheet metal. */
 export const solid = {
   onClick: (e: ThreeEvent<MouseEvent>) => e.stopPropagation(),
@@ -160,15 +171,10 @@ export function Tube(props: {
 }): ReactNode {
   const { points, radius, color, metalness = 0.1, roughness = 0.6, emissive = '#000000', hitPadding = 0, handlers } = props;
   const geometry = useMemo(() => {
-    const curve = new THREE.CatmullRomCurve3(
-      points.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
-      false,
-      'catmullrom',
-      0.35,
-    );
+    const curve = smoothCurve(points.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
     return {
-      visible: new THREE.TubeGeometry(curve, points.length * 10, radius, 8, false),
-      hit: hitPadding > 0 ? new THREE.TubeGeometry(curve, points.length * 6, radius + hitPadding, 6, false) : null,
+      visible: new THREE.TubeGeometry(curve, points.length * 28, radius, 12, false),
+      hit: hitPadding > 0 ? new THREE.TubeGeometry(curve, points.length * 10, radius + hitPadding, 6, false) : null,
     };
   }, [points, radius, hitPadding]);
   return (
@@ -206,7 +212,11 @@ export function Wire({ wire }: { wire: WireDef }): ReactNode {
         {...(handlers ? { handlers } : {})}
       />
       {clamped && (
-        <mesh position={mid as unknown as THREE.Vector3Tuple} rotation={[Math.PI / 2, 0, 0]}>
+        <mesh
+          position={mid as unknown as THREE.Vector3Tuple}
+          rotation={[Math.PI / 2, 0, 0]}
+          {...(clamp === undefined ? {} : interactive(`Clamp meter jaw around: ${clampLabel(clamp)}`, () => useSim.getState().clampWire(clamp)))}
+        >
           <torusGeometry args={[0.016, 0.005, 10, 24]} />
           <meshStandardMaterial color="#f5a623" emissive="#7a4a00" />
         </mesh>
@@ -257,7 +267,10 @@ export function TestPoint({ id }: { id: AnyTestPointId }): ReactNode {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
       {lead && (
-        <group rotation={rotation}>
+        <group
+          rotation={rotation}
+          {...interactive(`${lead === 'red' ? 'Red' : 'Black'} meter lead on: ${def.label}`, () => useSim.getState().probe(id))}
+        >
           <mesh position={[0, 0.03, 0]}>
             <cylinderGeometry args={[0.0018, 0.0012, 0.06, 8]} />
             <meshStandardMaterial color="#cfd3d6" metalness={0.9} roughness={0.2} />
@@ -269,7 +282,11 @@ export function TestPoint({ id }: { id: AnyTestPointId }): ReactNode {
         </group>
       )}
       {ncvHere && (
-        <group position={out(0.012)} rotation={rotation}>
+        <group
+          position={out(0.012)}
+          rotation={rotation}
+          {...interactive(`Voltage tester on: ${def.label}`, () => useSim.getState().probe(id))}
+        >
           <mesh position={[0, 0.045, 0]}>
             <cylinderGeometry args={[0.007, 0.004, 0.09, 10]} />
             <meshStandardMaterial

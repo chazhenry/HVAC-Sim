@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <style>
+    .blade { fill: #111; }
+    .hub { fill: #fff; stroke: #111; }
+    @media (prefers-color-scheme: dark) {
+      .blade { fill: #f2f2f2; }
+      .hub { fill: #1b1b1b; stroke: #f2f2f2; }
+    }
+  </style>
+  <g class="blade">
+    <path id="b" d="M8 8 C5.6 7.2 3.9 4.6 5.2 2.3 C6.4 0.3 9.6 0.4 10.3 2.6 C10.9 4.6 9.6 6.6 8 8 Z"/>
+    <use href="#b" transform="rotate(90 8 8)"/>
+    <use href="#b" transform="rotate(180 8 8)"/>
+    <use href="#b" transform="rotate(270 8 8)"/>
+  </g>
+  <circle class="hub" cx="8" cy="8" r="1.7" stroke-width="1"/>
+</svg>

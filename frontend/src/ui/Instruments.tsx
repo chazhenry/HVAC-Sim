@@ -240,7 +240,19 @@ function TempProbes(): ReactNode {
   );
 }
 
-export function Instruments(): ReactNode {
+type InstrumentId = 'meter' | 'clamp' | 'ncv' | 'gauges' | 'mano' | 'probes';
+
+const INSTRUMENT_NAME: Record<InstrumentId, string> = {
+  meter: 'Multimeter',
+  clamp: 'Clamp meter',
+  ncv: 'Voltage tester',
+  gauges: 'Manifold - R-410A',
+  mano: 'Manometer',
+  probes: 'Temperature probes',
+};
+
+/** Which readouts are showing: the instrument in hand plus any still connected to the unit. */
+function useShown(): Record<InstrumentId, boolean> {
   const tool = useSim((s) => s.tool);
   const hasLead = useSim((s) => s.leads.red !== null || s.leads.black !== null);
   const clampAt = useSim((s) => s.clampAt);
@@ -248,23 +260,50 @@ export function Instruments(): ReactNode {
   const anyGauge = useSim((s) => s.gauges.low || s.gauges.high || s.tempClamps.suction || s.tempClamps.liquid);
   const manoAt = useSim((s) => s.manoAt);
   const anyProbe = useSim((s) => s.probes.supply || s.probes.return);
-  const showMeter = tool === 'multimeter' || hasLead;
-  const showClamp = tool === 'clamp' || clampAt !== null;
-  const showNcv = tool === 'ncv' || ncvAt !== null;
-  const showGauges = tool === 'gauges' || tool === 'tempclamp' || anyGauge;
-  const showMano = tool === 'manometer' || manoAt !== null;
-  const showProbes = tool === 'thermo' || anyProbe;
-  if (!showMeter && !showClamp && !showNcv && !showGauges && !showMano && !showProbes) {
+  return {
+    meter: tool === 'multimeter' || hasLead,
+    clamp: tool === 'clamp' || clampAt !== null,
+    ncv: tool === 'ncv' || ncvAt !== null,
+    gauges: tool === 'gauges' || tool === 'tempclamp' || anyGauge,
+    mano: tool === 'manometer' || manoAt !== null,
+    probes: tool === 'thermo' || anyProbe,
+  };
+}
+
+const IN_HAND: Partial<Record<string, InstrumentId>> = {
+  multimeter: 'meter',
+  clamp: 'clamp',
+  ncv: 'ncv',
+  gauges: 'gauges',
+  tempclamp: 'gauges',
+  manometer: 'mano',
+  thermo: 'probes',
+};
+
+/** Names of the instruments in use, the one in hand first. Empty when none is. */
+export function useInstrumentNames(): string[] {
+  const shown = useShown();
+  const inHand = useSim((s) => IN_HAND[s.tool]);
+  const ids = (Object.keys(INSTRUMENT_NAME) as InstrumentId[]).filter((id) => shown[id]);
+  if (inHand) ids.sort((a, b) => Number(b === inHand) - Number(a === inHand));
+  return ids.map((id) => INSTRUMENT_NAME[id]);
+}
+
+export function Instruments(): ReactNode {
+  const shown = useShown();
+  if (!Object.values(shown).some(Boolean)) {
     return <p className="empty">Pick up an instrument from the tool bag to see its readout here.</p>;
   }
+  // With one instrument showing, the card title already names it, so its own heading is dropped.
+  const single = Object.values(shown).filter(Boolean).length === 1;
   return (
-    <>
-      {showMeter && <Multimeter />}
-      {showClamp && <ClampMeter />}
-      {showNcv && <VoltageTester />}
-      {showGauges && <Gauges />}
-      {showMano && <Manometer />}
-      {showProbes && <TempProbes />}
-    </>
+    <div className={single ? 'instruments single' : 'instruments'}>
+      {shown.meter && <Multimeter />}
+      {shown.clamp && <ClampMeter />}
+      {shown.ncv && <VoltageTester />}
+      {shown.gauges && <Gauges />}
+      {shown.mano && <Manometer />}
+      {shown.probes && <TempProbes />}
+    </div>
   );
 }

@@ -24,7 +24,7 @@ import {
   SWITCH_BOX,
 } from './furnaceLayout';
 import type { WireDef } from './layout';
-import { interactive, makeTextTexture, Movable, solid, TestPoint, Tube, Wire } from './parts';
+import { interactive, makeTextTexture, Movable, named, solid, TestPoint, Tube, Wire } from './parts';
 
 const CABINET = '#b4bac1';
 const DOOR = '#c7ccd2';
@@ -398,13 +398,13 @@ function Ducts(): ReactNode {
         <Sheet color={DUCT} />
       </mesh>
       {probes.supply && (
-        <mesh position={[0.1, 1.3, 0.04]}>
+        <mesh position={[0.1, 1.3, 0.04]} {...named('Temperature probe in the supply air')}>
           <sphereGeometry args={[0.018, 12, 12]} />
           <meshStandardMaterial color="#f2c200" />
         </mesh>
       )}
       {probes.return && (
-        <mesh position={[-0.435, 0.95, 0.26]}>
+        <mesh position={[-0.435, 0.95, 0.26]} {...named('Temperature probe in the return air')}>
           <sphereGeometry args={[0.018, 12, 12]} />
           <meshStandardMaterial color="#f2c200" />
         </mesh>

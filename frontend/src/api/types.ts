@@ -100,6 +100,23 @@ interface SessionBase {
 export type SessionResponse = SessionBase &
   ({ unitType: 'condenser'; unit: UnitParams } | { unitType: 'furnace'; furnace: FurnaceParams });
 
+export interface ChatTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  history: ChatTurn[];
+  /** What the learner can see and has measured right now. */
+  state: Record<string, unknown>;
+}
+
+export interface ChatResponse {
+  reply: string;
+  provider: string;
+}
+
 export interface HintResponse {
   hint: string;
   hintsUsed: number;

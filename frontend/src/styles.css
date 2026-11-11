@@ -139,7 +139,8 @@ h2 {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  --job-w: 340px;
 }
 
 .viewport {
@@ -152,7 +153,7 @@ h2 {
 .hoverbar {
   position: absolute;
   left: 50%;
-  bottom: 14px;
+  bottom: 58px;
   transform: translateX(-50%);
   background: rgba(14, 18, 24, 0.82);
   border: 1px solid var(--line);
@@ -268,10 +269,20 @@ h2 {
 /* ---------- job panel ---------- */
 
 .jobpanel {
-  width: 340px;
+  width: var(--job-w);
   padding: 12px;
   background: var(--panel);
-  border-left: 1px solid var(--line);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Work order and instruments take only the height they need (scrolling if that is
+   too much); the chat below takes everything left over. */
+.jobpanel-top {
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -758,8 +769,8 @@ h2 {
   .toolbox {
     width: 168px;
   }
-  .jobpanel {
-    width: 290px;
+  .stage {
+    --job-w: 290px;
   }
 }
 
@@ -1112,4 +1123,304 @@ h2 {
 
 .tstat-status.calling {
   border-left-color: var(--good);
+}
+
+/* ---------- what you see and hear ---------- */
+
+.statusbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 7px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 18px;
+  background: rgba(14, 18, 24, 0.86);
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  cursor: default;
+}
+
+.statusbar-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.statusbar > div {
+  display: flex;
+  gap: 6px;
+}
+
+.statusbar dt {
+  color: var(--muted);
+}
+
+.statusbar dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ---------- chat and job log tabs ---------- */
+
+.card.tabs-card {
+  padding: 0;
+  gap: 0;
+  flex: 1 1 0;
+  min-height: 250px;
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs button {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tabs button.on {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.badge {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+}
+
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+}
+
+.tab-body[hidden] {
+  display: none;
+}
+
+.tab-body .log {
+  max-height: none;
+}
+
+.chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-stream {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bubble {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 94%;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--blue) 26%, var(--panel));
+}
+
+.bubble.assistant {
+  align-self: flex-start;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.bubble.error {
+  align-self: flex-start;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
+.bubble.thinking {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.chat-input {
+  position: relative;
+}
+
+.chat-input textarea {
+  display: block;
+  width: 100%;
+  resize: none;
+  padding: 8px 42px 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #151a21;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.4;
+}
+
+.chat-input textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.chat-input textarea:disabled {
+  opacity: 0.6;
+}
+
+.chat-send {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--accent);
+}
+
+.chat-send:disabled {
+  color: var(--muted);
+}
+
+.chat-send:not(:disabled):hover {
+  background: var(--panel);
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ---------- splitter between the 3D view and the right-hand pane ---------- */
+
+.splitter {
+  width: 7px;
+  cursor: col-resize;
+  background: var(--line);
+  border-left: 1px solid var(--bg);
+  border-right: 1px solid var(--bg);
+  touch-action: none;
+  position: relative;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 1px;
+  height: 28px;
+  transform: translateY(-50%);
+  background: var(--muted);
+  box-shadow: 2px 0 0 var(--muted);
+  opacity: 0.6;
+}
+
+.splitter:hover,
+.splitter.dragging,
+.splitter:focus-visible {
+  background: var(--blue);
+  outline: none;
+}
+
+/* ---------- collapsible card header ---------- */
+
+.card-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.card-toggle:hover,
+.card-toggle:focus-visible {
+  color: var(--text);
+}
+
+.chev {
+  transition: transform 120ms ease;
+  transform: rotate(-90deg);
+}
+
+.chev.open {
+  transform: none;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The name of what a card currently holds, after its title. */
+.card-detail {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent);
+}
+
+.instruments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Keep a header only for what else it holds (the multimeter's mode buttons). */
+.instruments.single .instrument header > span:first-child {
+  display: none;
+}
+
+.instruments.single .instrument header:not(:has(.seg)) {
+  display: none;
 }

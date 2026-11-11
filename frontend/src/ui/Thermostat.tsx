@@ -269,12 +269,21 @@ export function ThermostatWidget(): ReactNode {
   const face = useFace();
   const style = useSim((s) => s.tstatStyle);
   const setStyle = useSim((s) => s.setTstatStyle);
+  const outdoorF = useSim((s) => (s.sim ?? s.furnace)?.env.outdoorF);
   const [menu, setMenu] = useState(false);
   const [dialog, setDialog] = useState(false);
   if (!face) return null;
+  const { mode, setpointF, roomF, calling } = face;
+  const details = [
+    mode === 'off' ? 'Thermostat: Off' : `Thermostat: ${mode === 'heat' ? 'Heat' : 'Cool'}, set ${setpointF} °F`,
+    `indoor ${roomF.toFixed(0)} °F`,
+    ...(outdoorF === undefined ? [] : [`outdoor ${outdoorF.toFixed(0)} °F`]),
+    mode === 'off' ? 'not calling' : calling ? `calling for ${mode === 'heat' ? 'heat' : 'cooling'}` : 'satisfied, not calling',
+    'click to set',
+  ].join(' · ');
   return (
     <div className="tstat">
-      <button type="button" className={`tstat-face ${style}`} title="Thermostat - click to set" onClick={() => setDialog(true)}>
+      <button type="button" className={`tstat-face ${style}`} title={details} aria-label={details} onClick={() => setDialog(true)}>
         <Face style={style} {...face} />
       </button>
       <button

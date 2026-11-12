@@ -21,9 +21,10 @@ const COPPER = '#b87333';
 const MID_Y = (BASE_Y + TOP_Y) / 2 + 0.005;
 const WALL_H = 0.8;
 
-const Metal = ({ color = CABINET }: { color?: string }): ReactNode => (
-  <meshStandardMaterial color={color} metalness={0.35} roughness={0.55} />
-);
+const Metal = ({ color }: { color?: string }): ReactNode => {
+  const cabinet = useSim((s) => s.context?.cabinetColor ?? CABINET);
+  return <meshStandardMaterial color={color ?? cabinet} metalness={0.35} roughness={0.55} />;
+};
 
 const NAMEPLATE = [
   'HS-36 CONDENSING UNIT',
@@ -40,14 +41,15 @@ const NAMEPLATE = [
 
 function Coil(): ReactNode {
   const fouling = useSim((s) => s.sim?.unit.coilFouling ?? 0);
+  const frost = useSim((s) => s.sim?.heatPump?.frost ?? 0);
   const texture = useMemo(() => {
     const t = makeFinTexture();
     t.repeat.set(36, 1);
     return t;
   }, []);
   const color = useMemo(
-    () => new THREE.Color('#aab4ba').lerp(new THREE.Color('#5c4a2f'), Math.min(1, fouling * 1.2)),
-    [fouling],
+    () => new THREE.Color('#aab4ba').lerp(new THREE.Color('#5c4a2f'), Math.min(1, fouling * 1.2)).lerp(new THREE.Color('#e9f5ff'), frost),
+    [fouling, frost],
   );
   const handlers = interactive(
     fouling > 0.3 ? 'Condenser coil - matted with lint and cottonwood' : 'Condenser coil',
@@ -237,6 +239,7 @@ function Compressor(): ReactNode {
 }
 
 function ControlBox(): ReactNode {
+  const heatPump = useSim((s) => s.context?.systemType === 'heat_pump');
   const contactorIn = useSim((s) => s.sim?.contactorIn ?? false);
   const contactor = interactive('Contactor - 2 pole, 24 V coil', () => useSim.getState().clickPart('contactor'));
   const capacitor = interactive('Dual run capacitor - 45/5 uF 440 V', () => useSim.getState().clickPart('capacitor'));
@@ -316,7 +319,12 @@ function ControlBox(): ReactNode {
       {WIRES.map((w) => (
         <Wire key={w.id} wire={w} />
       ))}
-      {ids.map((id) => (
+      {heatPump && <>
+        <mesh position={[0.265, 0.835, 0.30]} {...named('Goodman time/temperature defrost board')}>
+          <boxGeometry args={[0.21, 0.075, 0.015]} /><meshStandardMaterial color="#22643b" />
+        </mesh>
+      </>}
+      {ids.filter((id) => heatPump || !id.startsWith('HP_')).map((id) => (
         <TestPoint key={id} id={id} />
       ))}
     </group>
@@ -324,6 +332,8 @@ function ControlBox(): ReactNode {
 }
 
 function ServiceValves(): ReactNode {
+  const heatPump = useSim((s) => s.context?.systemType === 'heat_pump');
+  const heating = useSim((s) => s.sim?.controls.mode === 'heat');
   const tool = useSim((s) => s.tool);
   const gauges = useSim((s) => s.gauges);
   const clamps = useSim((s) => s.tempClamps);
@@ -331,7 +341,7 @@ function ServiceValves(): ReactNode {
 
   const valve = (pos: readonly [number, number, number], side: 'low' | 'high'): ReactNode => {
     const [x, y, z] = pos;
-    const name = side === 'low' ? 'Suction service port (low side)' : 'Liquid service port (high side)';
+    const name = side === 'low' ? (heatPump ? 'True suction access port (low side)' : 'Suction service port (low side)') : 'Liquid service port (high side)';
     return (
       <group key={side}>
         <mesh position={[x, y, z]} castShadow>
@@ -363,7 +373,10 @@ function ServiceValves(): ReactNode {
   const [mx, my, mz] = MANIFOLD_POS;
   return (
     <group>
-      {valve(SUCTION_VALVE, 'low')}
+      {valve(heatPump ? [0.47, 0.26, 0.05] : SUCTION_VALVE, 'low')}
+      {heatPump && <mesh position={[...SUCTION_VALVE]} {...named('Large vapor service valve · use separate true suction port for the low-side hose')}>
+        <boxGeometry args={[0.055, 0.05, 0.05]} /><meshStandardMaterial color="#b08d3c" metalness={0.8} />
+      </mesh>}
       {valve(LIQUID_VALVE, 'high')}
       {/* Line set running back to the house */}
       <Tube
@@ -372,7 +385,7 @@ function ServiceValves(): ReactNode {
         color="#141414"
         roughness={0.95}
         emissive={pipeHover}
-        handlers={interactive('Suction line (insulated)', () => useSim.getState().clickPipe('suction'))}
+        handlers={interactive(heatPump && heating ? 'Large vapor line (hot discharge gas in heating)' : 'Suction line (insulated)', () => useSim.getState().clickPipe('suction'))}
       />
       <Tube
         points={[[0.5, LIQUID_VALVE[1], 0.15], [0.7, LIQUID_VALVE[1], 0.15], [0.76, LIQUID_VALVE[1], 0.05], [0.76, LIQUID_VALVE[1], -0.7]]}
@@ -411,7 +424,7 @@ function ServiceValves(): ReactNode {
       )}
       {gauges.low && (
         <Tube
-          points={[[SUCTION_VALVE[0], SUCTION_VALVE[1], 0.21], [0.55, 0.2, 0.42], [0.8, 0.04, 0.5], [mx - 0.06, my - 0.02, mz]]}
+          points={[[SUCTION_VALVE[0], heatPump ? 0.26 : SUCTION_VALVE[1], heatPump ? 0.11 : 0.21], [0.55, 0.2, 0.42], [0.8, 0.04, 0.5], [mx - 0.06, my - 0.02, mz]]}
           radius={0.007}
           color="#1f5fbf"
           handlers={named('Blue hose - manifold low side to the suction service port')}
@@ -507,7 +520,20 @@ function ServiceEquipment(): ReactNode {
 
 export function Condenser(): ReactNode {
   const panels = useSim((s) => s.panels);
-  const nameplate = useMemo(() => makeTextTexture(NAMEPLATE, { width: 640, height: 420, size: 25 }), []);
+  const context = useSim((s) => s.context);
+  const cabinet = context?.cabinetColor ?? CABINET;
+  const nameplate = useMemo(() => makeTextTexture(context ? [
+    `${context.manufacturer} ${context.outdoorModel}`, `${context.supplyVolts} V   1 PH   60 Hz`,
+    `COMP RLA ${context.unit?.compressor.rla} LRA ${context.unit?.compressor.lra}`,
+    `FAN FLA ${context.unit?.fanMotor.fla} · PSC`,
+    `CAP ${context.unit?.capacitor.ratedHermUf}/${context.unit?.capacitor.ratedFanUf} uF`,
+    `${context.refrigerant} · ${context.factoryChargeLb} LB`,
+    context.systemType === 'heat_pump' ? 'SINGLE-STAGE HEAT PUMP · O = COOL' : 'SINGLE-STAGE A/C CONDENSER',
+    'TRAINING MODEL · SEE EQUIPMENT NOTES',
+  ] : NAMEPLATE, { width: 640, height: 420, size: 25 }), [context]);
+  const brand = useMemo(() => makeTextTexture([context?.manufacturer ?? 'HVAC-SIM'], {
+    width: 512, height: 128, size: 55, bg: '#a81c22', fg: '#ffffff',
+  }), [context?.manufacturer]);
   const compressorPoints = (Object.keys(TEST_POINTS) as TestPointId[]).filter(
     (id) => TEST_POINTS[id].enclosure === 'compressor',
   );
@@ -519,6 +545,18 @@ export function Condenser(): ReactNode {
 
   return (
     <group>
+      {context?.systemType === 'heat_pump' && <>
+        <mesh position={[-0.14, 0.70, 0.448]} {...named('Goodman single-stage split heat pump')}>
+          <planeGeometry args={[0.26, 0.065]} /><meshStandardMaterial map={brand} />
+        </mesh>
+        <mesh position={[-0.26, 0.32, -0.12]} {...named('Suction accumulator')}>
+          <cylinderGeometry args={[0.065, 0.065, 0.3, 24]} /><meshStandardMaterial color="#26292b" metalness={0.35} />
+        </mesh>
+        <mesh position={[0.12, 0.45, -0.08]} rotation={[0, 0, Math.PI / 2]} {...named('Four-way reversing valve · O energized in cooling and defrost')}>
+          <cylinderGeometry args={[0.026, 0.026, 0.20, 20]} /><meshStandardMaterial color={COPPER} metalness={0.75} roughness={0.3} />
+        </mesh>
+        {[0.05, 0.12, 0.19].map((x) => <Tube key={x} points={[[x, 0.45, -0.08], [x, 0.35, 0.02], [x - 0.1, 0.25, 0.1]]} radius={0.009} color={COPPER} />)}
+      </>}
       {/* Pad and base pan */}
       <mesh position={[0, BASE_Y / 2, 0]} receiveShadow castShadow>
         <boxGeometry args={[1.12, BASE_Y, 1.12]} />
@@ -538,13 +576,13 @@ export function Condenser(): ReactNode {
 
       {/* Fixed louvered sides */}
       <group position={[-HALF, MID_Y, 0]} rotation={[0, -Math.PI / 2, 0]}>
-        <LouverWall width={0.8} height={WALL_H} color={CABINET} />
+        <LouverWall width={0.8} height={WALL_H} color={cabinet} />
       </group>
       <group position={[0, MID_Y, -HALF]} rotation={[0, Math.PI, 0]}>
-        <LouverWall width={0.8} height={WALL_H} color={CABINET} />
+        <LouverWall width={0.8} height={WALL_H} color={cabinet} />
       </group>
       <group position={[HALF, MID_Y, -0.165]} rotation={[0, Math.PI / 2, 0]}>
-        <LouverWall width={0.47} height={WALL_H} color={CABINET} />
+        <LouverWall width={0.47} height={WALL_H} color={cabinet} />
       </group>
       {/* Solid corner panel carrying the service valves */}
       <mesh position={[0.431, MID_Y, 0.25]} castShadow {...solid}>
@@ -590,7 +628,7 @@ export function Condenser(): ReactNode {
         away={[-0.55, 0.02, 1.3]}
         awayRotation={[-Math.PI / 2, 0, -0.2]}
       >
-        <LouverWall width={0.55} height={WALL_H} color={CABINET} />
+        <LouverWall width={0.55} height={WALL_H} color={cabinet} />
         <mesh {...interactive('Front louver panel', () => useSim.getState().clickPanel('louver'))}>
           <boxGeometry args={[0.55, WALL_H, 0.02]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />

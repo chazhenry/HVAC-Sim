@@ -156,7 +156,8 @@ function Gauges(): ReactNode {
   const high = gauges.high ? liquidPsig(sim) : 0;
   const suctionLine = clamps.suction ? sim.thermo.suctionLineF : null;
   const liquidLine = clamps.liquid ? sim.thermo.liquidLineF : null;
-  const superheat = gauges.low && saturated && suctionLine !== null ? suctionLine - satTempF(low) : null;
+  const heating = sim.heatPump !== null && sim.controls.mode === 'heat';
+  const superheat = !heating && gauges.low && saturated && suctionLine !== null ? suctionLine - satTempF(low) : null;
   const subcool = gauges.high && saturated && liquidLine !== null ? satTempF(high) - liquidLine : null;
 
   return (
@@ -177,7 +178,7 @@ function Gauges(): ReactNode {
         </div>
       </div>
       <dl className="kv">
-        <dt>Suction line</dt>
+        <dt>{heating ? 'Large vapor line (hot gas)' : 'Suction line'}</dt>
         <dd>{fmt(suctionLine, '°F')}</dd>
         <dt>Liquid line</dt>
         <dd>{fmt(liquidLine, '°F')}</dd>
@@ -186,6 +187,7 @@ function Gauges(): ReactNode {
         <dt>Subcooling</dt>
         <dd className="strong">{fmt(subcool, '°F')}</dd>
       </dl>
+      {heating && <p className="fine">Blue hose: true suction port. The large vapor line carries hot gas in heating, so its clamp is not a suction superheat reading. Charge verification uses cooling mode.</p>}
       <ServiceCart />
     </div>
   );

@@ -44,7 +44,9 @@ def test_chat_replies_and_sends_state(client: TestClient, sent: list[Any]) -> No
         },
     )
     assert res.status_code == 200
-    assert res.json() == {"reply": "Check for 240 V at the contactor line side.", "provider": "fake"}
+    assert res.json()["reply"] == "Check for 240 V at the contactor line side."
+    assert res.json()["provider"] == "fake"
+    assert res.json()["replyId"]
     system, *turns = sent[0]
     assert system["role"] == "system"
     assert "loud hum, not running" in system["content"]

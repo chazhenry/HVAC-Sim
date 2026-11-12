@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "generic-furnace",
+  "name": "Generic 80% gas furnace",
+  "systemType": "gas_furnace",
+  "unitType": "furnace",
+  "outdoorModel": "Generic furnace",
+  "indoorModel": "80% single-stage gas furnace",
+  "furnace": {},
+  "environment": { "outdoorF": 35, "indoorF": 65, "setpointF": 72 },
+  "notes": "Original single-stage gas furnace training unit."
+}

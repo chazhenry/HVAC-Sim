@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import type { UnitType } from '../api/types';
 import { type ToolId, useSim } from '../store/useSim';
 import { toolIconUrl } from './toolIcons';
@@ -118,7 +118,15 @@ export function Toolbox(): ReactNode {
   const tool = useSim((s) => s.tool);
   const unitType = useSim((s) => s.unitType);
   const setTool = useSim((s) => s.setTool);
-  const groups = GROUPS[unitType];
+  const context = useSim((s) => s.context);
+  const groups = useMemo(() => GROUPS[unitType].map((group) => ({ ...group, tools: group.tools.map((item) => {
+    if (item.id === 'part_capacitor' && context?.unit) return { ...item,
+      name: `Capacitor ${context.unit.capacitor.ratedHermUf}/${context.unit.capacitor.ratedFanUf}` };
+    if (item.id === 'part_contactor' && context?.contactorPoles === 1) return { ...item, name: 'Contactor 1 pole' };
+    if (item.id === 'gauges' && context?.heatPump) return { ...item, how: 'Connect blue to the separate true suction access port and red to the liquid service port.' };
+    if (item.id === 'tempclamp' && context?.heatPump) return { ...item, how: 'Clamp the large vapor and liquid lines. In HEAT the vapor line carries hot gas; verify suction superheat in COOL mode.' };
+    return item;
+  }) })), [unitType, context]);
   const active = groups.flatMap((g) => g.tools).find((t) => t.id === tool);
   return (
     <aside className="toolbox">

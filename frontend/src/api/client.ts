@@ -1,5 +1,6 @@
 import type {
   CatalogResponse,
+  EquipmentContext,
   ChatRequest,
   ChatResponse,
   ExamPaper,
@@ -58,6 +59,9 @@ const post = (body?: unknown): RequestInit => ({
 });
 
 export const api = {
+  validateContext: (context: unknown) => request<EquipmentContext>('/contexts/validate', post(context)),
+  feedback: (replyId: string, rating: 'up' | 'down', explanation: string, user: string) =>
+    request<{ id: string }>('/feedback', post({ replyId, rating, explanation, user })),
   visitsAccess: () => request<{ allowed: boolean }>('/visits/access', { cache: 'no-store' }),
   visits: (search: string, offset: number, limit: number, signal: AbortSignal) =>
     request<VisitsPage>(`/visits?${new URLSearchParams({ search, offset: String(offset), limit: String(limit) })}`,
@@ -65,7 +69,7 @@ export const api = {
   trackVisit: (visitId: string, appVersion: string, event = 'home', user?: string) =>
     request<{ status: string }>('/visits', { ...post({ visitId, appVersion, event, user }), keepalive: true }),
   catalog: () => request<CatalogResponse>('/catalog'),
-  startSession: (scenarioId: string) => request<SessionResponse>('/sessions', post({ scenarioId })),
+  startSession: (scenarioId: string, context?: EquipmentContext) => request<SessionResponse>('/sessions', post({ scenarioId, context })),
   hint: (sessionId: string) => request<HintResponse>(`/sessions/${sessionId}/hint`, post()),
   chat: (sessionId: string, body: ChatRequest) =>
     request<ChatResponse>(`/sessions/${sessionId}/chat`, post(body)),

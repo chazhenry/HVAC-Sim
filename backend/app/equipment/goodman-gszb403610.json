@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "goodman-gszb403610",
+  "name": "Goodman GSZB4 · single-stage heat pump + AMST air handler",
+  "systemType": "heat_pump",
+  "unitType": "condenser",
+  "manufacturer": "Goodman",
+  "outdoorModel": "GSZB403610A",
+  "indoorModel": "AMST36CU1400",
+  "capacityBtuH": 36000,
+  "seer2": 14.3,
+  "hspf2": 7.5,
+  "supplyVolts": 230,
+  "contactorPoles": 1,
+  "minimumCircuitAmpacity": 21,
+  "maxOvercurrentAmps": 35,
+  "factoryChargeLb": 7.125,
+  "dimensionsM": { "width": 0.9017, "depth": 0.9017, "height": 1.006475 },
+  "cabinetColor": "#767a75",
+  "unit": {
+    "capacitor": { "ratedHermUf": 40, "ratedFanUf": 5, "hermUf": 40, "fanUf": 5 },
+    "compressor": { "rla": 16, "lra": 91.9 },
+    "fanMotor": { "fla": 0.97 }
+  },
+  "heatPump": { "defrostIntervalMinutes": 60, "smartShiftSeconds": 30, "maxDefrostSeconds": 600,
+    "sensorCloseF": 31, "sensorOpenF": 75, "auxiliaryHeatKw": 5 },
+  "sources": [
+    "https://www.amgair.com/content/documents/goodman/SpecSheet-gszb4.pdf",
+    "https://theacoutlet.com/cdn/shop/files/Repair-Parts-Goodman-GSZB4.pdf",
+    "https://apps.goodmanmfg.com/brochures/files/649f4676180f7CT-GOODMAN_FullCat%205.23.pdf",
+    "https://device.report/m/de82a17ddae682bf6021ca211027e72c905263c0c884e6843cbcf346d2b67838_optim.pdf"
+  ],
+  "notes": "R-410A installed-base training model, not the newer R-32 product. Family efficiency ratings; exact performance depends on the AHRI match. Catalog dimensions, electrical ratings, charge and capacitor are sourced. Winding resistances, sensor thresholds, 30-second shift delays, thermal behavior and 5 kW optional auxiliary heater are explicit training assumptions, not a factory calibration or charging chart."
+}

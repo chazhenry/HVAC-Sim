@@ -94,6 +94,7 @@ export function stepService(
   equalisedPsig: number,
   compressorRunning: boolean,
   dt: number,
+  factoryChargeLb = FACTORY_CHARGE_LB,
 ): ServiceStep {
   const s: ServiceState = { ...prev };
   const events: ServiceEvent[] = [];
@@ -104,7 +105,7 @@ export function stepService(
     if (charge > 0) {
       const moved = Math.min(charge, 0.045 * dt);
       charge -= moved;
-      s.recoveredLb += moved * FACTORY_CHARGE_LB;
+      s.recoveredLb += moved * factoryChargeLb;
       if (cylinderFill(prev) <= CYLINDER_FILL_LIMIT && cylinderFill(s) > CYLINDER_FILL_LIMIT) events.push('svc_overfill');
     } else {
       // Charge is out: the machine keeps pulling the vapor space into a vacuum.
@@ -118,7 +119,7 @@ export function stepService(
     if (charge === 0) s.nonCondensables = s.microns > 5000;
     const moved = Math.min(1.4 - charge, (compressorRunning ? 0.03 : 0.07) * dt);
     charge += moved;
-    s.addedLb += moved * FACTORY_CHARGE_LB;
+    s.addedLb += moved * factoryChargeLb;
     s.microns = ATMOSPHERE_MICRONS;
     s.holdBase = null;
   }

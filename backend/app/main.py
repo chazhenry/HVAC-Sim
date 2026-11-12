@@ -26,8 +26,11 @@ from .exam import (
 )
 from . import llm
 from .grading import grade
+from .feedback import FeedbackRequest
+from .contexts import CONTEXTS, apply_context
 from .models import (
     ApiModel,
+    EquipmentContext,
     CatalogResponse,
     GradeResponse,
     HintResponse,
@@ -75,7 +78,10 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         row = store.get(session_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Unknown session")
-        return row, SCENARIO_BY_ID[row.scenario_id]
+        scenario = SCENARIO_BY_ID[row.scenario_id]
+        if (config := store.get_context(session_id)) is not None:
+            scenario = apply_context(scenario, EquipmentContext.model_validate_json(config))
+        return row, scenario
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -118,15 +124,28 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     @app.get("/api/catalog", response_model=CatalogResponse)
     def catalog() -> CatalogResponse:
         return CatalogResponse(
-            scenarios=[s.summary() for s in SCENARIOS], diagnoses=list(DIAGNOSES)
+            scenarios=[s.summary() for s in SCENARIOS], diagnoses=list(DIAGNOSES), contexts=list(CONTEXTS)
         )
+
+    @app.post("/api/contexts/validate", response_model=EquipmentContext)
+    def validate_context(body: EquipmentContext) -> EquipmentContext:
+        return body
 
     @app.post("/api/sessions", response_model=SessionResponse)
     def start_session(body: StartSessionRequest) -> SessionResponse:
         scenario = SCENARIO_BY_ID.get(body.scenario_id)
         if scenario is None:
             raise HTTPException(status_code=404, detail="Unknown scenario")
+        if body.context is not None:
+            try:
+                scenario = apply_context(scenario, body.context)
+            except ValueError as error:
+                raise HTTPException(status_code=422, detail=str(error)) from error
+        elif scenario.id.startswith("hp-"):
+            raise HTTPException(status_code=422, detail="Choose a heat pump equipment context")
         row = store.create(scenario.id)
+        if body.context is not None:
+            store.set_context(row.id, body.context.model_dump_json(by_alias=True))
         return SessionResponse(
             session_id=row.id,
             scenario=scenario.summary(),
@@ -134,6 +153,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             unit=scenario.unit,
             furnace=scenario.furnace,
             environment=scenario.environment,
+            context=body.context,
         )
 
     @app.post("/api/sessions/{session_id}/hint", response_model=HintResponse)
@@ -164,12 +184,22 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         if (refusal := limiter.check(session_id)) is not None:
             raise HTTPException(status_code=429, detail=refusal)
         try:
-            reply, provider = await llm.complete(build_messages(scenario, body))
+            config = store.get_context(session_id)
+            equipment = EquipmentContext.model_validate_json(config) if config else None
+            reply, provider = await llm.complete(build_messages(scenario, body, equipment))
         except llm.LlmNotConfigured as e:
             raise HTTPException(status_code=503, detail=str(e)) from e
         except llm.LlmError as e:
             raise HTTPException(status_code=502, detail="The tutor could not be reached. Try again.") from e
-        return ChatResponse(reply=reply, provider=provider)
+        reply_id = store.record_reply(session_id, body.message, reply, provider)
+        return ChatResponse(reply=reply, provider=provider, reply_id=reply_id)
+
+    @app.post("/api/feedback", status_code=201)
+    def submit_feedback(body: FeedbackRequest) -> dict[str, str]:
+        feedback_id = store.save_feedback(str(body.reply_id), body.user, body.rating, body.explanation)
+        if feedback_id is None:
+            raise HTTPException(status_code=404, detail="Unknown tutor reply")
+        return {"id": feedback_id}
 
     @app.get("/api/exam", response_model=list[SectionInfo])
     def exam_sections() -> list[SectionInfo]:

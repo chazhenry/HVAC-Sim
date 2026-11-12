@@ -1,4 +1,5 @@
-import type { Environment, UnitParams } from '../api/types';
+import type { Environment, EquipmentContext, UnitParams } from '../api/types';
+import { createHeatPump, stepHeatPump, type HeatPumpState } from './heatPump';
 import { cabs, csub } from './circuit';
 import { type AcSolution, type MotorState, type SwitchState, solveAc } from './electrical';
 import { satPsig } from './refrigerant';
@@ -8,6 +9,7 @@ export interface Controls {
   disconnectIn: boolean;
   /** Thermostat set to COOL and calling. */
   calling: boolean;
+  mode?: 'off' | 'cool' | 'heat';
 }
 
 export interface Thermo {
@@ -42,9 +44,12 @@ export interface SimState {
   /** Recovery / evacuation / charging equipment and what it has done. */
   service: ServiceState;
   solution: AcSolution;
+  context: EquipmentContext | null;
+  heatPump: HeatPumpState | null;
 }
 
 export type SimEvent =
+  | 'hp_defrost_start' | 'hp_defrost_end' | 'hp_shift'
   | 'contactor_in'
   | 'contactor_out'
   | 'compressor_start'
@@ -87,11 +92,13 @@ export const switchState = (s: SimState): SwitchState => ({
   compressor: s.compressor,
   fan: s.fan,
   compressorLoadAmps: s.compressorLoadAmps,
+  ...(s.context ? { lineVolts: s.context.supplyVolts, singlePole: s.context.contactorPoles === 1 } : {}),
+  ...(s.heatPump ? { heatPump: s.heatPump } : {}),
 });
 
 const equalisedF = (env: Environment): number => 0.6 * env.outdoorF + 0.4 * env.indoorF;
 
-export function createSim(unit: UnitParams, env: Environment): SimState {
+export function createSim(unit: UnitParams, env: Environment, context: EquipmentContext | null = null): SimState {
   const eq = equalisedF(env);
   const base: Omit<SimState, 'solution'> = {
     t: 0,
@@ -110,6 +117,8 @@ export function createSim(unit: UnitParams, env: Environment): SimState {
     thermo: { headSatF: eq, suctSatF: eq, suctionLineF: env.outdoorF, liquidLineF: env.outdoorF },
     capCharged: false,
     service: initialService(),
+    context,
+    heatPump: context?.heatPump ? createHeatPump(context.heatPump, env.outdoorF) : null,
   };
   const withSolution = { ...base, solution: undefined as unknown as AcSolution };
   withSolution.solution = solveAc(base.unit, switchState(withSolution));
@@ -133,6 +142,24 @@ function stepThermo(s: SimState, dt: number): Thermo {
       suctionLineF: approach(thermo.suctionLineF, env.outdoorF, 30, dt),
       liquidLineF: approach(thermo.liquidLineF, env.outdoorF, 30, dt),
     };
+  }
+
+  if (s.heatPump?.stage === 'defrost') {
+    // Heat melts frost in the outdoor coil while its fan is intentionally stopped.
+    // Do not apply the cooling-mode "failed condenser fan" pressure model here.
+    const headSatF = approach(thermo.headSatF, 95, 10, dt);
+    const suctSatF = approach(thermo.suctSatF, 35, 6, dt);
+    return { headSatF, suctSatF,
+      suctionLineF: approach(thermo.suctionLineF, suctSatF + 10, 7, dt),
+      liquidLineF: approach(thermo.liquidLineF, headSatF - 10, 7, dt) };
+  }
+  if (s.heatPump && s.controls.mode === 'heat') {
+    const suctSatF = approach(thermo.suctSatF, env.outdoorF - 12 - 35 * Math.max(0, 1 - unit.chargeFraction), 6, dt);
+    const headSatF = approach(thermo.headSatF, env.indoorF + 40 + 30 * Math.max(0, unit.chargeFraction - 1), 10, dt);
+    // On a heat pump the large service line carries hot discharge gas in heating.
+    return { suctSatF, headSatF,
+      suctionLineF: approach(thermo.suctionLineF, headSatF + 20, 7, dt),
+      liquidLineF: approach(thermo.liquidLineF, headSatF - 10, 7, dt) };
   }
 
   const charge = unit.chargeFraction;
@@ -167,8 +194,16 @@ export interface StepResult {
 }
 
 /** Advance the simulation by dt seconds. Pure: returns a new state. */
-export function stepSim(prev: SimState, dt: number): StepResult {
+export function stepSim(previous: SimState, dt: number): StepResult {
   const events: SimEvent[] = [];
+  let prev = previous;
+  if (previous.heatPump) {
+    const result = stepHeatPump(previous.heatPump, { dt, mode: previous.controls.mode ?? 'off',
+      calling: previous.controls.calling, powered: previous.controls.disconnectIn && previous.unit.fuseL1Ok && previous.unit.fuseL2Ok,
+      compressorRunning: previous.compressor === 'running', outdoorF: previous.env.outdoorF });
+    prev = resolve({ ...previous, heatPump: result.state });
+    events.push(...result.events);
+  }
   const { v } = prev.solution;
 
   // --- service equipment on the refrigerant circuit -------------------------
@@ -178,6 +213,7 @@ export function stepSim(prev: SimState, dt: number): StepResult {
     satPsig(equalisedF(prev.env)),
     prev.compressor === 'running',
     dt,
+    prev.context?.factoryChargeLb,
   );
   events.push(...serviced.events);
   const service = serviced.service;
@@ -231,7 +267,7 @@ export function stepSim(prev: SimState, dt: number): StepResult {
   }
 
   // --- condenser fan -------------------------------------------------------
-  const fanVolts = volts('T1', 'T2');
+  const fanVolts = prev.heatPump?.fanPermitted === false ? 0 : volts('T1', 'T2');
   const fanCanStart =
     fanMotor.runOhms !== null &&
     fanMotor.auxOhms !== null &&
@@ -263,11 +299,13 @@ export function stepSim(prev: SimState, dt: number): StepResult {
     events.push('hps_reset');
   }
   let lpsOpen = prev.lpsOpen;
-  if (!lpsOpen && suct <= LPS_OPEN_PSIG) {
+  const lowOpen = prev.heatPump && prev.controls.mode === 'heat' ? 15 : LPS_OPEN_PSIG;
+  const lowClose = prev.heatPump && prev.controls.mode === 'heat' ? 45 : LPS_CLOSE_PSIG;
+  if (!lpsOpen && suct <= lowOpen) {
     lpsOpen = true;
     // Only worth announcing if it actually stopped a running unit.
     if (prev.compressor === 'running') events.push('lps_trip');
-  } else if (lpsOpen && suct >= LPS_CLOSE_PSIG) {
+  } else if (lpsOpen && suct >= lowClose) {
     lpsOpen = false;
     events.push('lps_reset');
   }

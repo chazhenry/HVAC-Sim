@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from 'react';
 import { useSim } from '../store/useSim';
 import { ChatPanel } from './ChatPanel';
+import { EquipmentStatus } from './EquipmentStatus';
 import { Instruments, useInstrumentNames } from './Instruments';
 
 /**
@@ -76,6 +77,8 @@ export function JobPanel(): ReactNode {
         <CollapsibleCard id="work-order" title="Work order" summary={<h3 className="job-title">{scenario.title}</h3>}>
           <p className="complaint">{scenario.complaint}</p>
         </CollapsibleCard>
+
+        <EquipmentStatus />
 
         <CollapsibleCard id="instruments" title="Instruments" {...(instruments ? { detail: instruments } : {})}>
           <Instruments />

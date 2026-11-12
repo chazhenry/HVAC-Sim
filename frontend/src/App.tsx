@@ -1,7 +1,7 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api/client';
 import { F_VIEWS } from './scene/furnaceLayout';
-import { VIEWS } from './scene/layout';
+import { contextViews } from './scene/layout';
 import { Scene, useView } from './scene/Scene';
 import { useSim } from './store/useSim';
 import { Menu, ResultDialog, SubmitDialog } from './ui/Dialogs';
@@ -22,7 +22,9 @@ const TICK_SECONDS = 0.1;
 
 function TopBar({ onSubmit, onDiagram }: { onSubmit: () => void; onDiagram: () => void }): ReactNode {
   const go = useView((s) => s.go);
-  const views = useSim((s) => (s.unitType === 'furnace' ? F_VIEWS : VIEWS));
+  const unitType = useSim((s) => s.unitType);
+  const context = useSim((s) => s.context);
+  const views = useMemo(() => unitType === 'furnace' ? F_VIEWS : contextViews(context), [unitType, context]);
   const hints = useSim((s) => s.hints.length);
   const hintsTotal = useSim((s) => s.hintsTotal);
   const requestHint = useSim((s) => s.requestHint);
@@ -79,7 +81,8 @@ export function App(): ReactNode {
   // Frame the right piece of equipment whenever a new job starts.
   useEffect(() => {
     if (sessionId === null) return;
-    const first = (useSim.getState().unitType === 'furnace' ? F_VIEWS : VIEWS)[0];
+    const state = useSim.getState();
+    const first = (state.unitType === 'furnace' ? F_VIEWS : contextViews(state.context))[0];
     if (first) useView.getState().go(first);
   }, [sessionId]);
 

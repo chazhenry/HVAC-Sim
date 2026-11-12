@@ -7,9 +7,10 @@ TypeScript interfaces in ``frontend/src/api/types.ts``.
 from __future__ import annotations
 
 from enum import Enum
+import math
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -90,6 +91,83 @@ class Environment(ApiModel):
     setpoint_f: float = 72.0
 
 
+class CabinetDimensions(ApiModel):
+    width: float = Field(0.86, ge=0.5, le=2)
+    depth: float = Field(0.86, ge=0.4, le=2)
+    height: float = Field(0.85, ge=0.5, le=2)
+
+
+class HeatPumpConfig(ApiModel):
+    defrost_interval_minutes: Literal[30, 60, 90] = 60
+    smart_shift_seconds: float = Field(30, ge=0, le=60)
+    max_defrost_seconds: float = Field(600, ge=60, le=900)
+    sensor_close_f: float = Field(31, ge=-10, le=40)
+    sensor_open_f: float = Field(75, ge=45, le=100)
+    auxiliary_heat_kw: float = Field(5, ge=0, le=25)
+
+
+class EquipmentContext(ApiModel):
+    """Portable equipment definition, independent of faults and runtime state."""
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    schema_version: Literal[1] = 1
+    id: str = Field(min_length=1, max_length=80, pattern=r"^[a-z0-9][a-z0-9_-]*$")
+    name: str = Field(min_length=1, max_length=150)
+    system_type: Literal["air_conditioner", "heat_pump", "gas_furnace"]
+    unit_type: UnitType
+    manufacturer: str = Field(default="Generic", max_length=80)
+    outdoor_model: str = Field(default="HS-36", max_length=80)
+    indoor_model: str = Field(default="Generic indoor coil", max_length=80)
+    refrigerant: Literal["R-410A"] = "R-410A"
+    capacity_btu_h: int = Field(default=36000, ge=12000, le=60000)
+    seer2: float | None = Field(default=None, ge=10, le=30)
+    hspf2: float | None = Field(default=None, ge=5, le=15)
+    supply_volts: Literal[208, 230, 240] = 240
+    contactor_poles: Literal[1, 2] = 2
+    minimum_circuit_ampacity: float | None = Field(default=None, gt=0, le=100)
+    max_overcurrent_amps: float | None = Field(default=None, gt=0, le=100)
+    factory_charge_lb: float = Field(default=6.5, gt=0, le=30)
+    dimensions_m: CabinetDimensions = Field(default_factory=CabinetDimensions)
+    cabinet_color: str = Field(default="#c4c7c2", pattern=r"^#[0-9a-fA-F]{6}$")
+    environment: Environment = Field(default_factory=Environment)
+    unit: UnitParams | None = None
+    furnace: FurnaceParams | None = None
+    heat_pump: HeatPumpConfig | None = None
+    sources: list[str] = Field(default_factory=list, max_length=10)
+    notes: str = Field(default="", max_length=3000)
+
+    @model_validator(mode="after")
+    def compatible(self) -> EquipmentContext:
+        def finite(value: object) -> None:
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("Equipment values must be finite numbers")
+            if isinstance(value, dict):
+                for item in value.values():
+                    finite(item)
+            elif isinstance(value, list):
+                for item in value:
+                    finite(item)
+        finite(self.model_dump())
+        if self.unit_type == "furnace":
+            if self.system_type != "gas_furnace" or self.furnace is None or self.unit is not None or self.heat_pump is not None:
+                raise ValueError("A furnace context requires furnace parameters only")
+        elif self.unit is None or self.furnace is not None or self.system_type == "gas_furnace":
+            raise ValueError("An outdoor context requires condenser parameters only")
+        if (self.system_type == "heat_pump") != (self.heat_pump is not None):
+            raise ValueError("Heat pump contexts require heatPump controls")
+        if self.unit and (self.unit.capacitor.rated_herm_uf <= 0 or self.unit.capacitor.rated_fan_uf <= 0
+                          or self.unit.compressor.rla <= 0 or self.unit.compressor.lra <= 0 or self.unit.fan_motor.fla <= 0):
+            raise ValueError("Electrical nameplate ratings must be positive")
+        if self.unit:
+            if not 0 <= self.unit.charge_fraction <= 1.4:
+                raise ValueError("This refrigerant model supports charge fractions from 0 to 1.4")
+            for resistance in (self.unit.contactor.coil_ohms, self.unit.contactor.pole1_ohms, self.unit.contactor.pole2_ohms,
+                               self.unit.compressor.run_ohms, self.unit.compressor.start_ohms,
+                               self.unit.fan_motor.run_ohms, self.unit.fan_motor.aux_ohms):
+                if resistance is not None and resistance <= 0:
+                    raise ValueError("Use positive winding/contact resistance, or null for an open circuit")
+        return self
+
+
 # --------------------------------------------------------------------------
 # Scenarios / sessions
 # --------------------------------------------------------------------------
@@ -119,10 +197,12 @@ class DiagnosisOption(ApiModel):
 class CatalogResponse(ApiModel):
     scenarios: list[ScenarioSummary]
     diagnoses: list[DiagnosisOption]
+    contexts: list[EquipmentContext] = Field(default_factory=list)
 
 
 class StartSessionRequest(ApiModel):
     scenario_id: str
+    context: EquipmentContext | None = None
 
 
 class SessionResponse(ApiModel):
@@ -132,6 +212,7 @@ class SessionResponse(ApiModel):
     unit: UnitParams | None = None
     furnace: FurnaceParams | None = None
     environment: Environment
+    context: EquipmentContext | None = None
 
 
 class HintResponse(ApiModel):
@@ -167,6 +248,9 @@ class FinalState(ApiModel):
     """Snapshot of the unit at the moment the learner closes the job."""
 
     calling_for_cooling: bool
+    operating_mode: Literal["cool", "heat"] = "cool"
+    defrost_active: bool = False
+    heat_delivered: bool = False
     compressor_running: bool
     fan_running: bool
     suction_psig: float

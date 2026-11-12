@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "generic-ac",
+  "name": "Generic residential A/C",
+  "systemType": "air_conditioner",
+  "unitType": "condenser",
+  "unit": {},
+  "notes": "Original HS-36 R-410A training unit. Electrical and thermal values are training assumptions."
+}

@@ -44,7 +44,7 @@ export function Disconnect(): ReactNode {
     <group>
       {/* House wall */}
       <mesh position={[1.0, 0.95, -0.75]} receiveShadow castShadow {...solid}>
-        <boxGeometry args={[1.0, 1.9, 0.1]} />
+        <boxGeometry args={[0.55, 1.9, 0.1]} />
         <meshStandardMaterial color="#d6cdbb" roughness={0.9} />
       </mesh>
 

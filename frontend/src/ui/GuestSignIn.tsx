@@ -1,19 +1,10 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { APP_VERSION } from '../version';
-
-const GUEST_NAME_KEY = 'hvac-sim.guest-name';
-
-function rememberedName(): string {
-  try {
-    return (window.localStorage.getItem(GUEST_NAME_KEY) ?? '').trim().slice(0, 100);
-  } catch {
-    return '';
-  }
-}
+import { rememberedGuestName, rememberGuestName } from '../store/guest';
 
 export function GuestSignIn({ onSignIn }: { onSignIn: (name: string) => void }): ReactNode {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [name, setName] = useState(rememberedName);
+  const [name, setName] = useState(rememberedGuestName);
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
@@ -30,7 +21,7 @@ export function GuestSignIn({ onSignIn }: { onSignIn: (name: string) => void }):
         event.preventDefault();
         const user = name.trim();
         if (!user) return;
-        try { window.localStorage.setItem(GUEST_NAME_KEY, user); } catch { /* Continue if storage is unavailable. */ }
+        rememberGuestName(user);
         onSignIn(user);
       }}>
         <label htmlFor="guest-name">Enter your name if invited</label>

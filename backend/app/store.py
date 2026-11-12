@@ -32,6 +32,30 @@ CREATE TABLE IF NOT EXISTS visits (
 );
 CREATE INDEX IF NOT EXISTS visits_ip_time ON visits (ip, visited_at);
 CREATE INDEX IF NOT EXISTS visits_time ON visits (visited_at DESC, id DESC);
+CREATE TABLE IF NOT EXISTS chat_replies (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS session_contexts (
+    session_id TEXT PRIMARY KEY,
+    config_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS feedback (
+    id TEXT PRIMARY KEY,
+    reply_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    user TEXT NOT NULL,
+    rating TEXT NOT NULL CHECK(rating IN ('up', 'down')),
+    prompt TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    explanation TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(reply_id, user)
+);
 """
 
 
@@ -63,6 +87,38 @@ class SessionStore:
                 self._db.execute("ALTER TABLE visits ADD COLUMN event TEXT NOT NULL DEFAULT 'home'")
             if "user" not in columns:
                 self._db.execute("ALTER TABLE visits ADD COLUMN user TEXT")
+
+    def set_context(self, session_id: str, config_json: str) -> None:
+        with self._lock, self._db:
+            self._db.execute("INSERT OR REPLACE INTO session_contexts VALUES (?, ?)", (session_id, config_json))
+
+    def get_context(self, session_id: str) -> str | None:
+        with self._lock:
+            row = self._db.execute("SELECT config_json FROM session_contexts WHERE session_id = ?", (session_id,)).fetchone()
+        return row["config_json"] if row else None
+
+    def record_reply(self, session_id: str, prompt: str, answer: str, provider: str) -> str:
+        reply_id = str(uuid.uuid4())
+        with self._lock, self._db:
+            self._db.execute("INSERT INTO chat_replies VALUES (?, ?, ?, ?, ?, ?)",
+                             (reply_id, session_id, prompt, answer, provider, _now()))
+        return reply_id
+
+    def save_feedback(self, reply_id: str, user: str, rating: str, explanation: str) -> str | None:
+        with self._lock, self._db:
+            reply = self._db.execute("SELECT * FROM chat_replies WHERE id = ?", (reply_id,)).fetchone()
+            if reply is None:
+                return None
+            feedback_id = str(uuid.uuid4())
+            self._db.execute(
+                "INSERT INTO feedback VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(reply_id, user) DO UPDATE SET rating=excluded.rating, "
+                "explanation=excluded.explanation, created_at=excluded.created_at",
+                (feedback_id, reply_id, reply["session_id"], user, rating, reply["prompt"],
+                 reply["answer"], explanation, _now()),
+            )
+            return self._db.execute("SELECT id FROM feedback WHERE reply_id = ? AND user = ?",
+                                    (reply_id, user)).fetchone()["id"]
 
     def record_visit(self, visit_id: str, ip: str, app_version: str, event: str = "home", user: str | None = None) -> bool:
         """Persist before geolocation; retrying a visit ID cannot count it twice."""

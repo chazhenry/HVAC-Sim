@@ -48,6 +48,12 @@ def operating_normally(state: FinalState) -> tuple[bool, str]:
         return False, "Compressor was not running when the job was closed."
     if not state.fan_running:
         return False, "Condenser fan was not running when the job was closed."
+    if state.operating_mode == "heat":
+        if state.defrost_active or not state.heat_delivered:
+            return False, "Wait for defrost to finish and verify that the indoor unit delivers heat."
+        if not 30 <= state.suction_psig <= 160 or not 250 <= state.liquid_psig <= 500:
+            return False, "Heating pressures are outside this trainer's operating range."
+        return True, "Heat pump left delivering heat after the defrost/valve sequence."
     if not 100 <= state.suction_psig <= 140:
         return False, f"Suction pressure {state.suction_psig:.0f} psig is outside 100-140 psig."
     if not 320 <= state.liquid_psig <= 440:

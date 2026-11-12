@@ -321,6 +321,22 @@ from .furnace_scenarios import FURNACE_DIAGNOSES, FURNACE_SCENARIOS  # noqa: E40
 
 DIAGNOSES = DIAGNOSES + FURNACE_DIAGNOSES
 SCENARIOS = SCENARIOS + FURNACE_SCENARIOS
+SCENARIOS += (
+    Scenario(id="hp-heating", title="Heat pump: winter heating sequence", difficulty=Difficulty.intro,
+             complaint="Room is cool. Verify the heat call, indoor blower, outdoor compressor and reversing valve sequence.",
+             diagnosis_id="no_fault", required_repair=None, unit=UnitParams(),
+             environment=Environment(outdoor_f=35, indoor_f=68, setpoint_f=72),
+             explanation="This heat pump is healthy. In HEAT the O circuit is de-energized; Y calls the compressor and G runs the indoor blower.",
+             hints=("Set the thermostat to HEAT above room temperature.", "Compare Y-C and O-C on the defrost board.",
+                    "Confirm the large vapor line is hot and the indoor air handler is delivering heat.")),
+    Scenario(id="hp-defrost", title="Heat pump: observe a defrost cycle", difficulty=Difficulty.medium,
+             complaint="The outdoor coil frosts on a cold day. Observe defrost and verify that heating resumes afterward.",
+             diagnosis_id="no_fault", required_repair=None, unit=UnitParams(),
+             environment=Environment(outdoor_f=28, indoor_f=68, setpoint_f=72),
+             explanation="Defrost temporarily energizes O, stops the outdoor fan and enables auxiliary heat. Shift delays protect the compressor; heating resumes when defrost ends.",
+             hints=("Call for HEAT and allow the outdoor coil to cool.", "With the cold-coil sensor closed, use the board TEST control to advance the timer.",
+                    "Watch the shift delays, O output, outdoor fan and W2 output, then confirm normal heating returns.")),
+)
 
 DIAGNOSIS_BY_ID: dict[str, DiagnosisOption] = {d.id: d for d in DIAGNOSES}
 SCENARIO_BY_ID: dict[str, Scenario] = {s.id: s for s in SCENARIOS}

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { api } from '../api/client';
 import type {
   CatalogResponse,
+  EquipmentContext,
   FurnaceParams,
   GradeResponse,
   RepairAction,
@@ -121,6 +122,9 @@ const PANEL_NAMES: Record<PanelId, string> = {
 };
 
 const EVENT_TEXT: Record<SimEvent, readonly [LogKind, string]> = {
+  hp_defrost_start: ['info', 'Defrost: O energized, outdoor fan stopped, auxiliary heat on.'],
+  hp_defrost_end: ['good', 'Defrost complete. Compressor pauses for the return to heating.'],
+  hp_shift: ['sound', 'Defrost controller changes sequence state (SmartShift).'],
   contactor_in: ['sound', 'Click - the contactor pulls in.'],
   contactor_out: ['sound', 'Clack - the contactor drops out.'],
   compressor_start: ['sound', 'The compressor starts and settles into a steady drone.'],
@@ -192,6 +196,7 @@ export interface AppState {
   sessionId: string | null;
   scenario: ScenarioSummary | null;
   unitType: UnitType;
+  context: EquipmentContext | null;
   /** Condenser simulation (null on a furnace job). */
   sim: SimState | null;
   /** Furnace simulation (null on a condenser job). */
@@ -227,7 +232,8 @@ export interface AppState {
   result: GradeResponse | null;
 
   loadCatalog: () => Promise<void>;
-  startScenario: (id: string) => Promise<void>;
+  startScenario: (id: string, context?: EquipmentContext) => Promise<void>;
+  testDefrost: () => void;
   backToMenu: () => void;
   tick: (dt: number) => void;
   setTool: (tool: ToolId) => void;
@@ -413,6 +419,7 @@ export const useSim = create<AppState>()((set, get) => {
     sessionId: null,
     scenario: null,
     unitType: 'condenser',
+    context: null,
     sim: null,
     furnace: null,
     tstatStyle: savedStyle(),
@@ -427,10 +434,10 @@ export const useSim = create<AppState>()((set, get) => {
       }
     },
 
-    startScenario: async (id) => {
+    startScenario: async (id, context) => {
       set({ busy: true, error: null });
       try {
-        const session = await api.startSession(id);
+        const session = await api.startSession(id, context);
         const common = {
           ...fresh,
           busy: false,
@@ -438,13 +445,14 @@ export const useSim = create<AppState>()((set, get) => {
           sessionId: session.sessionId,
           scenario: session.scenario,
           unitType: session.unitType,
+          context: session.context,
           tstat: { mode: 'off' as TstatMode, setpointF: Math.round(session.environment.setpointF) },
         };
         if (session.unitType === 'furnace') {
           set({ ...common, sim: null, furnace: createFurnace(session.furnace, session.environment) });
           say('You arrive on site. The furnace has power and the thermostat is off.');
         } else {
-          set({ ...common, furnace: null, sim: createSim(session.unit, session.environment) });
+          set({ ...common, furnace: null, sim: createSim(session.unit, session.environment, session.context) });
           say('You arrive on site. The disconnect is in and the thermostat is off.');
         }
       } catch (e) {
@@ -453,7 +461,18 @@ export const useSim = create<AppState>()((set, get) => {
     },
 
     backToMenu: () =>
-      set({ ...fresh, phase: 'menu', sim: null, furnace: null, sessionId: null, scenario: null }),
+      set({ ...fresh, phase: 'menu', sim: null, furnace: null, sessionId: null, scenario: null, context: null }),
+
+    testDefrost: () => {
+      const { sim } = get();
+      if (!sim?.heatPump || sim.controls.mode !== 'heat' || !sim.controls.calling || !sim.heatPump.sensorClosed || sim.compressor !== 'running') {
+        say('Defrost TEST needs a running heat call and a closed cold-coil sensor.');
+        return;
+      }
+      if (sim.heatPump.stage !== 'idle') return;
+      set({ sim: { ...sim, heatPump: { ...sim.heatPump, heatingRunSeconds: sim.heatPump.config.defrostIntervalMinutes * 60 } } });
+      say('Defrost board TEST: advanced the interval timer.');
+    },
 
     tick: (dt) => {
       const { sim, furnace, phase } = get();
@@ -496,7 +515,8 @@ export const useSim = create<AppState>()((set, get) => {
         tstat.mode === 'cool' ? roomF > tstat.setpointF : tstat.mode === 'heat' ? roomF < tstat.setpointF : false;
       const changed = calling !== unit.controls.calling;
       set({ tstat });
-      if (changed && sim) set({ sim: resolve({ ...sim, controls: { ...sim.controls, calling } }) });
+      if (sim) set({ sim: resolve({ ...sim, controls: { ...sim.controls,
+        calling: sim.heatPump ? calling : tstat.mode === 'cool' && calling, mode: tstat.mode } }) });
       else if (changed && furnace) set({ furnace: resolveFurnace({ ...furnace, controls: { ...furnace.controls, calling } }) });
       // Stepping the setpoint without crossing room temperature is not worth a log line.
       if (!changed && tstat.mode === before.mode) return;
@@ -659,7 +679,7 @@ export const useSim = create<AppState>()((set, get) => {
               { capCharged: false },
             );
             addRepair('replace_capacitor');
-            say('Fitted a new 45/5 uF dual run capacitor.', 'good');
+            say(`Fitted a new ${sim.unit.capacitor.ratedHermUf}/${sim.unit.capacitor.ratedFanUf} uF dual run capacitor.`, 'good');
           } else {
             say('Dual run capacitor. Use the discharge tool, the meter, or a new capacitor from the parts bin.');
           }
@@ -1024,6 +1044,9 @@ export const useSim = create<AppState>()((set, get) => {
           ? {
               finalState: {
                 callingForCooling: sim.controls.calling,
+                operatingMode: sim.controls.mode === 'heat' ? 'heat' : 'cool',
+                defrostActive: sim.heatPump !== null && sim.heatPump.stage !== 'idle',
+                heatDelivered: sim.heatPump !== null && sim.controls.mode === 'heat' && sim.compressor === 'running' && sim.heatPump.stage === 'idle' && sim.thermo.headSatF > sim.env.indoorF + 10,
                 compressorRunning: sim.compressor === 'running',
                 fanRunning: sim.fan === 'running',
                 suctionPsig: suctionPsig(sim),
@@ -1039,8 +1062,8 @@ export const useSim = create<AppState>()((set, get) => {
                 pressureTestPsig: sim.service.pressureTestPsig,
                 deepestMicrons: sim.service.deepestMicrons,
                 heldMicrons: sim.service.heldMicrons,
-                finalChargeLb: sim.unit.chargeFraction * FACTORY_CHARGE_LB,
-                factoryChargeLb: FACTORY_CHARGE_LB,
+                finalChargeLb: sim.unit.chargeFraction * (sim.context?.factoryChargeLb ?? FACTORY_CHARGE_LB),
+                factoryChargeLb: sim.context?.factoryChargeLb ?? FACTORY_CHARGE_LB,
               },
             }
           : {}),

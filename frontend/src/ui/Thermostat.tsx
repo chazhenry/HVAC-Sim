@@ -190,6 +190,7 @@ function ThermostatDialog({ onClose }: { onClose: () => void }): ReactNode {
   const setStyle = useSim((s) => s.setTstatStyle);
   const set = useSim((s) => s.setThermostat);
   const onMode: TstatMode = useSim((s) => (s.unitType === 'furnace' ? 'heat' : 'cool'));
+  const heatPump = useSim((s) => s.context?.systemType === 'heat_pump');
   const outdoorF = useSim((s) => (s.sim ?? s.furnace)?.env.outdoorF);
   if (!face) return null;
   const { mode, setpointF, roomF, calling } = face;
@@ -215,6 +216,7 @@ function ThermostatDialog({ onClose }: { onClose: () => void }): ReactNode {
             <button type="button" className={mode === onMode ? `on ${onMode}` : ''} onClick={() => set({ mode: onMode })}>
               {onMode === 'heat' ? 'Heat' : 'Cool'}
             </button>
+            {heatPump && <button type="button" className={mode === 'heat' ? 'on heat' : ''} onClick={() => set({ mode: 'heat' })}>Heat</button>}
           </div>
         </div>
         <div className="tstat-row">

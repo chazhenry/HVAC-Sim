@@ -3,7 +3,8 @@ import { useChat } from '../store/useChat';
 import { useSim } from '../store/useSim';
 import { JOB_LOG_TOAST_CLOSED } from './JobLogToasts';
 import { ChatMessage } from './ChatMessage';
-import { isPowerCommand } from '../store/usePowerCommands';
+import { ReplyFeedback } from './ReplyFeedback';
+import { isPowerCommand, usePowerCommands } from '../store/usePowerCommands';
 
 function Log(): ReactNode {
   const log = useSim((s) => s.log);
@@ -44,6 +45,8 @@ function Chat(): ReactNode {
   const pending = useChat((s) => s.pending && s.sessionId === jobId);
   const prompts = useChat((s) => s.prompts);
   const send = useChat((s) => s.send);
+  const listMode = usePowerCommands((s) => s.listMode);
+  const executeCommand = usePowerCommands((s) => s.execute);
   const messages = chatJob === jobId ? all : [];
 
   const [draft, setDraft] = useState('');
@@ -105,6 +108,8 @@ function Chat(): ReactNode {
         {messages.map((m) => (
           <div key={m.id} className={`bubble ${m.role}${m.kind === 'power_command' ? ' power-command' : ''}`}>
             <ChatMessage content={m.content} />
+            {m.role === 'assistant' && !m.kind && m.replyId && m.prompt &&
+              <ReplyFeedback replyId={m.replyId} prompt={m.prompt} answer={m.content} />}
           </div>
         ))}
         {pending && <p className="bubble assistant thinking"><Spinner /> Thinking…</p>}
@@ -124,6 +129,21 @@ function Chat(): ReactNode {
           }}
           onKeyDown={onKeyDown}
         />
+        <button
+          type="button"
+          className="chat-list-mode"
+          aria-label={listMode ? 'Hide cursor part labels' : 'Show cursor part labels'}
+          aria-pressed={listMode}
+          title={`List mode ${listMode ? 'on' : 'off'} — click to ${listMode ? 'hide' : 'show'} part labels (/l)`}
+          onClick={() => executeCommand('/l')}
+        >
+          <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+            <circle cx={12} cy={12} r={3} />
+            {!listMode && <path d="m3 3 18 18" />}
+          </svg>
+        </button>
         <button
           type="button"
           className="chat-send"

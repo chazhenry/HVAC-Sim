@@ -102,6 +102,9 @@ tutor reply is pending, and remain available in prompt history.
 
 ## Adding a scenario
 
+Equipment JSON contexts, the Goodman heat-pump model, and tutor reply feedback are
+described in [Equipment contexts and feedback](docs/equipment-contexts.md).
+
 Add a `Scenario` to `backend/app/scenarios.py`: override the `UnitParams` fields that describe
 the fault, and set the `diagnosis_id`, `required_repair`, explanation and hints. No frontend
 change is needed unless the fault needs a new physical parameter.

@@ -9,6 +9,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'error';
   content: string;
   kind?: 'power_command';
+  prompt?: string;
+  replyId?: string;
 }
 
 const HISTORY_KEY = 'hvac-sim.chat-prompts';
@@ -89,7 +91,8 @@ export const useChat = create<ChatState>()((set, get) => ({
     let reply: ChatMessage;
     try {
       const res = await api.chat(sessionId, { message, history, state: chatState(sim) });
-      reply = { id: ++nextId, role: 'assistant', content: res.reply };
+      reply = { id: ++nextId, role: 'assistant', content: res.reply, prompt: message,
+        ...(res.replyId ? { replyId: res.replyId } : {}) };
     } catch (e) {
       reply = { id: ++nextId, role: 'error', content: e instanceof Error ? e.message : String(e) };
     }

@@ -20,10 +20,15 @@ export function observationRows(s: AppState): Array<[string, string]> {
   }
   if (sim) {
     return [
+      ...(sim.heatPump ? [
+        ['Reversing valve O', sim.heatPump.reversingValveEnergized ? 'energized · cooling/defrost' : 'de-energized · heat'],
+        ['Defrost', sim.heatPump.stage.replaceAll('_', ' ')],
+      ] as Array<[string, string]> : []),
       ['Disconnect', sim.controls.disconnectIn ? 'in' : 'pulled'],
       ['Condenser fan', sim.fanSpeed > 0.4 ? 'spinning' : sim.fan === 'locked' ? 'buzzing, not turning' : 'stopped'],
       ['Compressor', sim.compressor === 'running' ? 'running' : sim.compressor === 'locked' ? 'loud hum, not running' : 'silent'],
-      ['Suction line', sim.thermo.suctionLineF < 62 ? 'cold to the touch' : 'not cold'],
+      [sim.heatPump && sim.controls.mode === 'heat' ? 'Large vapor line' : 'Suction line',
+        sim.thermo.suctionLineF > 100 ? 'hot to the touch' : sim.thermo.suctionLineF < 62 ? 'cold to the touch' : 'not cold'],
     ];
   }
   return [];
@@ -75,6 +80,11 @@ export function chatState(s: AppState): Record<string, unknown> {
 
   const out: Record<string, unknown> = {
     unitType: s.unitType,
+    ...(s.context ? { equipment: { name: s.context.name, outdoorModel: s.context.outdoorModel,
+      indoorModel: s.context.indoorModel, refrigerant: s.context.refrigerant, supplyVolts: s.context.supplyVolts } } : {}),
+    ...(sim?.heatPump ? { heatPump: { stage: sim.heatPump.stage, O_energized: sim.heatPump.reversingValveEnergized,
+      W2_auxiliaryHeat: sim.heatPump.auxiliaryHeat, indoorBlower: sim.heatPump.indoorBlower,
+      coilSensorClosed: sim.heatPump.sensorClosed, coilF: round(sim.heatPump.coilF) } } : {}),
     simulatorClock: clock(activeTime(s)),
     thermostat: {
       mode: s.tstat.mode,
@@ -111,7 +121,7 @@ export function chatState(s: AppState): Record<string, unknown> {
         ...(s.gauges.high && saturated ? { highSaturationF: round(satTempF(high), 0) } : {}),
         ...(suctionLine !== null ? { suctionLineF: round(suctionLine) } : {}),
         ...(liquidLine !== null ? { liquidLineF: round(liquidLine) } : {}),
-        ...(s.gauges.low && saturated && suctionLine !== null ? { superheatF: round(suctionLine - satTempF(low)) } : {}),
+        ...(s.gauges.low && saturated && suctionLine !== null && !(sim.heatPump && sim.controls.mode === 'heat') ? { superheatF: round(suctionLine - satTempF(low)) } : {}),
         ...(s.gauges.high && saturated && liquidLine !== null ? { subcoolingF: round(satTempF(high) - liquidLine) } : {}),
       };
       instruments.serviceCart = {

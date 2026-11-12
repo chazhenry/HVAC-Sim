@@ -5,9 +5,11 @@ import * as THREE from 'three';
 import { create } from 'zustand';
 import { useSim } from '../store/useSim';
 import { Condenser } from './Condenser';
+import { AirHandler } from './AirHandler';
 import { Disconnect } from './Disconnect';
 import { Furnace } from './Furnace';
-import { HOME_VIEW, type View } from './layout';
+import { airHandlerPosition, HOME_VIEW, type View } from './layout';
+import { named, Tube } from './parts';
 
 /** Camera preset requests from the HUD. `n` makes repeat requests distinct. */
 export const useView = create<{ view: View; n: number; go: (view: View) => void }>()((set) => ({
@@ -60,6 +62,11 @@ function Controls(): ReactNode {
 }
 
 function Outdoors(): ReactNode {
+  const context = useSim((s) => s.context);
+  const dimensions = context?.dimensionsM;
+  const scale: [number, number, number] = dimensions ? [dimensions.width / 0.86, dimensions.height / 0.85, dimensions.depth / 0.86] : [1, 1, 1];
+  const indoor = context?.systemType === 'heat_pump' ? airHandlerPosition(context) : null;
+  const [sx, sy, sz] = scale;
   return (
     <>
       <color attach="background" args={['#b9d0e2']} />
@@ -74,8 +81,19 @@ function Outdoors(): ReactNode {
       </mesh>
       <pointLight position={[0.3, 0.6, 0.9]} intensity={0.6} distance={1.6} />
       <pointLight position={[-0.1, 1.5, 0]} intensity={0.8} distance={2} />
-      <Condenser />
-      <Disconnect />
+      <group scale={scale}><Condenser /><Disconnect /></group>
+      <AirHandler />
+      {indoor && <>
+        <Tube points={[[.8 * sx, .32 * sy, -.7 * sz], [.8 * sx, .32 * sy, -.95 * sz],
+          [indoor[0] + .36, .40, indoor[2] + .23], [indoor[0] + .26, .43, indoor[2] + .12]]}
+          radius={.021} color="#141414" roughness={.95} handlers={named('Insulated vapor refrigerant line through the wall to the indoor coil')} />
+        <Tube points={[[.76 * sx, .2 * sy, -.7 * sz], [.76 * sx, .2 * sy, -.95 * sz],
+          [indoor[0] + .36, .25, indoor[2] + .10], [indoor[0] + .26, .28, indoor[2] - .02]]}
+          radius={.008} color="#b87333" metalness={.8} handlers={named('Liquid refrigerant line through the wall to the indoor TXV')} />
+        <Tube points={[[.437 * sx, .5 * sy, .34 * sz], [.62 * sx, .45 * sy, .24 * sz], [.94 * sx, .44 * sy, -.7 * sz],
+          [.94 * sx, .44 * sy, -.95 * sz], [indoor[0] + .31, .74, indoor[2] + .12], [indoor[0] + .26, .74, indoor[2]]]}
+          radius={.005} color="#66503c" handlers={named('24 V control cable linking the outdoor board and indoor air handler')} />
+      </>}
     </>
   );
 }

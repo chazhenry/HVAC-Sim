@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react';
-import type { Difficulty, UnitType } from '../api/types';
+import type { Difficulty, UnitType, EquipmentContext } from '../api/types';
+import { EquipmentPicker } from './EquipmentPicker';
 import type { ExamSection } from '../api/types';
 import { useSim } from '../store/useSim';
 import { Exam, ExamSections } from './Exam';
@@ -24,6 +25,8 @@ export function Menu(): ReactNode {
   const start = useSim((s) => s.startScenario);
   const reload = useSim((s) => s.loadCatalog);
   const [exam, setExam] = useState<ExamSection | null>(null);
+  const [chosen, setChosen] = useState<EquipmentContext | null>(null);
+  const context = chosen ?? catalog?.contexts[0] ?? null;
   if (exam) return <Exam section={exam} onClose={() => setExam(null)} />;
   return (
     <div className="overlay">
@@ -33,6 +36,7 @@ export function Menu(): ReactNode {
           Pick a service call, find the fault with real instruments, make the repair and prove the
           equipment runs.
         </p>
+        {catalog && context && <EquipmentPicker contexts={catalog.contexts} selected={context} onSelect={setChosen} />}
         {error && (
           <div className="error" role="alert">
             <p>{error}</p>
@@ -45,13 +49,13 @@ export function Menu(): ReactNode {
         )}
         {!catalog && !error && <p>Loading service calls…</p>}
         {catalog &&
-          (Object.keys(UNIT_TITLE) as UnitType[]).map((unit) => (
+          (Object.keys(UNIT_TITLE) as UnitType[]).filter((unit) => !context || context.unitType === unit).map((unit) => (
           <section key={unit} className="unit-group">
-          <h3>{UNIT_TITLE[unit]}</h3>
+          <h3>{context?.systemType === 'heat_pump' ? context.name : UNIT_TITLE[unit]}</h3>
           <ul className="scenarios">
-            {catalog.scenarios.filter((s) => s.unitType === unit).map((s) => (
+            {catalog.scenarios.filter((s) => s.unitType === unit && (!s.id.startsWith('hp-') || context?.systemType === 'heat_pump')).map((s) => (
               <li key={s.id}>
-                <button type="button" disabled={busy} onClick={() => void start(s.id)}>
+                <button type="button" disabled={busy} onClick={() => void start(s.id, context ?? undefined)}>
                   <span className={`pill ${s.difficulty}`}>{DIFFICULTY_LABEL[s.difficulty]}</span>
                   <strong>{s.title}</strong>
                   <span className="complaint">{s.complaint}</span>

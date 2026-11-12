@@ -1,5 +1,6 @@
 import type { AnyClampId } from '../sim/points';
 import type { TestPointId } from '../sim/testPoints';
+import type { EquipmentContext } from '../api/types';
 
 export type Vec3 = readonly [number, number, number];
 
@@ -13,6 +14,11 @@ export const SUCTION_VALVE: Vec3 = [0.47, 0.32, 0.15];
 export const LIQUID_VALVE: Vec3 = [0.47, 0.2, 0.15];
 export const MANIFOLD_POS: Vec3 = [0.98, 0.1, 0.5];
 
+/** Indoor cutaway behind the house wall, exposed beyond its right-hand edge. */
+export function airHandlerPosition(context: EquipmentContext): Vec3 {
+  return [context.dimensionsM.width / .86 + .45, .1, -.75 * context.dimensionsM.depth / .86 - .55];
+}
+
 export interface TestPointPlacement {
   pos: Vec3;
   /** Direction the probe sticks out of the terminal. */
@@ -20,6 +26,11 @@ export interface TestPointPlacement {
 }
 
 export const TEST_POINT_PLACEMENT: Record<TestPointId, TestPointPlacement> = {
+  HP_R: { pos: [0.185, 0.825, 0.34], normal: 'front' },
+  HP_C: { pos: [0.225, 0.825, 0.34], normal: 'front' },
+  HP_Y: { pos: [0.265, 0.825, 0.34], normal: 'front' },
+  HP_O: { pos: [0.305, 0.825, 0.34], normal: 'front' },
+  HP_W2: { pos: [0.345, 0.825, 0.34], normal: 'front' },
   CONT_L1: { pos: [0.21, 0.745, 0.326], normal: 'front' },
   CONT_L2: { pos: [0.26, 0.745, 0.326], normal: 'front' },
   CONT_T1: { pos: [0.21, 0.655, 0.326], normal: 'front' },
@@ -165,3 +176,12 @@ export const VIEWS: readonly View[] = [
   { label: 'Service valves', camera: [1.35, 0.55, 0.8], target: [0.55, 0.26, 0.15] },
 ];
 export const HOME_VIEW: View = { label: 'Whole unit', camera: [1.5, 1.25, 2.3], target: [0.2, 0.55, 0] };
+
+export function contextViews(context: EquipmentContext | null): readonly View[] {
+  if (!context) return VIEWS;
+  const d = context.dimensionsM;
+  const scale = (v: Vec3): Vec3 => [v[0] * d.width / .86, v[1] * d.height / .85, v[2] * d.depth / .86];
+  return VIEWS.map((view, index) => context.systemType === 'heat_pump' && index === 0
+    ? { label: view.label, camera: scale([3.4, 1.8, 2.7]), target: scale([.65, .65, -.45]) }
+    : { ...view, camera: scale(view.camera), target: scale(view.target) });
+}

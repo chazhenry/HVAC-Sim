@@ -1,4 +1,5 @@
 import type { UnitParams } from '../api/types';
+import type { HeatPumpState } from './heatPump';
 import { type Branch, type Complex, cabs, cdiv, cinv, csub, cx, solveNetwork, ZERO } from './circuit';
 
 /**
@@ -30,10 +31,12 @@ export const NODES = [
   'LV_SW',
   'COIL_Y',
   'LV_C',
+  'HP_IN', 'HP_O', 'HP_W2',
 ] as const;
 export type NodeId = (typeof NODES)[number];
 
 export type ElementId =
+  | 'HP_BOARD' | 'HP_RV' | 'HP_AUX'
   | 'DISC_L1'
   | 'DISC_L2'
   | 'POLE1'
@@ -64,6 +67,9 @@ export interface SwitchState {
   fan: MotorState;
   /** Run-winding current the compressor draws at its present load (A). */
   compressorLoadAmps: number;
+  lineVolts?: number;
+  singlePole?: boolean;
+  heatPump?: HeatPumpState;
 }
 
 interface Element {
@@ -113,10 +119,13 @@ export function buildElements(unit: UnitParams, s: SwitchState): Element[] {
     { id: 'DISC_L1', a: 'L1_LINE', b: 'L1_LOAD', ...closed(s.disconnectIn && unit.fuseL1Ok) },
     { id: 'DISC_L2', a: 'L2_LINE', b: 'L2_LOAD', ...closed(s.disconnectIn && unit.fuseL2Ok) },
     { id: 'POLE1', a: 'L1_LOAD', b: 'T1', ...pole(contactor.pole1Ohms) },
-    { id: 'POLE2', a: 'L2_LOAD', b: 'T2', ...pole(contactor.pole2Ohms) },
+    { id: 'POLE2', a: 'L2_LOAD', b: 'T2', ...(s.singlePole ? closed(true) : pole(contactor.pole2Ohms)) },
     { id: 'TSTAT', a: 'LV_R', b: 'LV_Y', ...closed(s.calling) },
     { id: 'HPS', a: 'LV_Y', b: 'LV_SW', ...closed(!s.hpsOpen) },
-    { id: 'LPS', a: 'LV_SW', b: 'COIL_Y', ...closed(!s.lpsOpen) },
+    { id: 'LPS', a: 'LV_SW', b: s.heatPump ? 'HP_IN' : 'COIL_Y', ...closed(!s.lpsOpen) },
+    { id: 'HP_BOARD', a: 'HP_IN', b: 'COIL_Y', ...closed(!!s.heatPump?.compressorPermitted) },
+    { id: 'HP_RV', a: 'HP_O', b: 'LV_C', z: s.heatPump ? cx(48, 15) : null, rdc: s.heatPump ? 48 : null },
+    { id: 'HP_AUX', a: 'HP_W2', b: 'LV_C', z: s.heatPump ? cx(120) : null, rdc: s.heatPump ? 120 : null },
     {
       id: 'COIL',
       a: 'COIL_Y',
@@ -144,14 +153,14 @@ export function buildElements(unit: UnitParams, s: SwitchState): Element[] {
       id: 'FAN_RUN',
       a: 'T1',
       b: 'T2',
-      z: fanMotor.runOhms === null ? null : fanRunZ,
+      z: fanMotor.runOhms === null || s.heatPump?.fanPermitted === false ? null : fanRunZ,
       rdc: fanMotor.runOhms,
     },
     {
       id: 'FAN_AUX',
       a: 'T1',
       b: 'FAN_BRN',
-      z: fanMotor.auxOhms === null ? null : fanAuxZ,
+      z: fanMotor.auxOhms === null || s.heatPump?.fanPermitted === false ? null : fanAuxZ,
       rdc: fanMotor.auxOhms,
     },
     { id: 'CAP_FAN', a: 'FAN_BRN', b: 'T2', z: capacitorZ(capacitor.fanUf), rdc: null },
@@ -184,7 +193,12 @@ export function solveAc(
   for (const e of elements) if (e.z !== null) branches.push({ a: e.a, b: e.b, y: cinv(e.z) });
   if (meter) branches.push({ a: meter[0], b: meter[1], y: cx(METER_SIEMENS) });
 
-  const v = solveNetwork({ nodes: NODES, fixed: SOURCES, branches });
+  const fixed: Partial<Record<NodeId, Complex>> = { ...SOURCES,
+    L1_LINE: cx((s.lineVolts ?? LINE_VOLTS) / 2), L2_LINE: cx(-(s.lineVolts ?? LINE_VOLTS) / 2),
+    HP_O: cx(s.heatPump?.reversingValveEnergized ? 24 : 0), HP_W2: cx(s.heatPump?.auxiliaryHeat ? 24 : 0),
+    ...(!s.heatPump ? { HP_IN: ZERO } : {}),
+  };
+  const v = solveNetwork({ nodes: NODES, fixed, branches });
   const i = {} as Record<ElementId, Complex>;
   for (const e of elements) i[e.id] = e.z === null ? ZERO : cdiv(csub(v[e.a], v[e.b]), e.z);
   return { v, i };

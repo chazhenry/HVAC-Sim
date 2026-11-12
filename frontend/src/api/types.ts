@@ -70,6 +70,43 @@ export interface Environment {
   setpointF: number;
 }
 
+export interface HeatPumpConfig {
+  defrostIntervalMinutes: 30 | 60 | 90;
+  smartShiftSeconds: number;
+  maxDefrostSeconds: number;
+  sensorCloseF: number;
+  sensorOpenF: number;
+  auxiliaryHeatKw: number;
+}
+
+export interface EquipmentContext {
+  schemaVersion: 1;
+  id: string;
+  name: string;
+  systemType: 'air_conditioner' | 'heat_pump' | 'gas_furnace';
+  unitType: UnitType;
+  manufacturer: string;
+  outdoorModel: string;
+  indoorModel: string;
+  refrigerant: 'R-410A';
+  capacityBtuH: number;
+  seer2: number | null;
+  hspf2: number | null;
+  supplyVolts: 208 | 230 | 240;
+  contactorPoles: 1 | 2;
+  minimumCircuitAmpacity: number | null;
+  maxOvercurrentAmps: number | null;
+  factoryChargeLb: number;
+  dimensionsM: { width: number; depth: number; height: number };
+  cabinetColor: string;
+  environment: Environment;
+  unit: UnitParams | null;
+  furnace: FurnaceParams | null;
+  heatPump: HeatPumpConfig | null;
+  sources: string[];
+  notes: string;
+}
+
 export type Difficulty = 'intro' | 'easy' | 'medium' | 'hard';
 
 export interface ScenarioSummary {
@@ -89,12 +126,14 @@ export interface DiagnosisOption {
 export interface CatalogResponse {
   scenarios: ScenarioSummary[];
   diagnoses: DiagnosisOption[];
+  contexts: EquipmentContext[];
 }
 
 interface SessionBase {
   sessionId: string;
   scenario: ScenarioSummary;
   environment: Environment;
+  context: EquipmentContext | null;
 }
 
 export type SessionResponse = SessionBase &
@@ -115,6 +154,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   reply: string;
   provider: string;
+  replyId?: string;
 }
 
 export interface HintResponse {
@@ -147,6 +187,9 @@ export type RepairAction =
 
 export interface FinalState {
   callingForCooling: boolean;
+  operatingMode?: 'cool' | 'heat';
+  defrostActive?: boolean;
+  heatDelivered?: boolean;
   compressorRunning: boolean;
   fanRunning: boolean;
   suctionPsig: number;

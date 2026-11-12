@@ -257,7 +257,7 @@ function FurnaceTrace(): ReactNode {
 
 // ---------- condenser ----------
 
-const C_POINTS: Record<TestPointId, Pt> = {
+const C_POINTS: Record<Exclude<TestPointId, `HP_${string}`>, Pt> = {
   DISC_L1_LINE: [50, 34, 'w'],
   DISC_L1_LOAD: [50, 92, 'w'],
   CONT_L1: [50, 122, 'w'],
@@ -500,17 +500,45 @@ function FurnaceDiagram({ trace }: { trace: boolean }): ReactNode {
 
 // ---------- panel ----------
 
+function HeatPumpDiagram(): ReactNode {
+  const hp = useSim((s) => s.sim?.heatPump);
+  const volts = useSim((s) => s.context?.supplyVolts ?? 230);
+  return <svg viewBox="0 0 520 430" role="img" aria-label="Single-stage heat pump control diagram">
+    <rect width="520" height="430" fill={PAPER} />
+    <T x={260} y={24} bold size={13}>HEAT PUMP · 24 V CONTROLS</T>
+    <Wires color={INK}>
+      <path d="M60 70H170V110H260V160H450M60 240H450M60 310H450" />
+      <rect x="170" y="90" width="170" height="95" rx="6" />
+      <path d="M260 185V240M340 130H450V310M450 160V200" />
+    </Wires>
+    <T x={100} y={58}>R → THERMOSTAT Y</T>
+    <T x={255} y={125} bold>DEFROST BOARD</T>
+    <T x={255} y={146}>Cold-coil sensor / timer</T>
+    <T x={255} y={167}>SmartShift compressor delay</T>
+    <T x={400} y={147}>CONTACTOR</T>
+    <T x={390} y={205}>COMPRESSOR</T>
+    <T x={180} y={229}>O → REVERSING VALVE</T>
+    <T x={200} y={265}>{hp?.reversingValveEnergized ? 'O = 24 V: COOL / DEFROST' : 'O = 0 V: HEAT'}</T>
+    <T x={200} y={299}>W2 → AIR HANDLER AUX HEAT</T>
+    <T x={260} y={338}>{`LINE POWER ${volts} V → CONTACTOR → COMPRESSOR / FAN`}</T>
+    <T x={260} y={365}>DEFROST OPENS OUTDOOR FAN RELAY</T>
+    <T x={260} y={390}>G → INDOOR ECM BLOWER · C = CONTROL COMMON</T>
+    <Markers points={{ HP_R: [60, 70, 'n'], HP_Y: [170, 70, 'n'], HP_C: [60, 365, 'n'], HP_O: [60, 240, 'n'], HP_W2: [60, 310, 'n'] }} clamps={{}} />
+  </svg>;
+}
+
 export function WiringDiagram({ onClose }: { onClose: () => void }): ReactNode {
   const isFurnace = useSim((s) => s.unitType === 'furnace');
+  const heatPump = useSim((s) => s.context?.systemType === 'heat_pump');
   const [large, setLarge] = useState(false);
   // Tracing shows which switch is open, so it is only offered where there is no fault to find.
-  const canTrace = useSim((s) => s.scenario?.id.endsWith('orientation') ?? false);
+  const canTrace = useSim((s) => (s.scenario?.id.endsWith('orientation') ?? false) && s.context?.systemType !== 'heat_pump');
   const [wantTrace, setTrace] = useState(false);
   const trace = canTrace && wantTrace;
   return (
     <aside className={`diagram${large ? ' large' : ''}`} aria-label="Wiring diagram">
       <header>
-        <strong>Wiring diagram - {isFurnace ? 'gas furnace' : 'condensing unit'}</strong>
+        <strong>Wiring diagram - {heatPump ? 'heat pump' : isFurnace ? 'gas furnace' : 'condensing unit'}</strong>
         <span className="spacer" />
         <button
           type="button"
@@ -528,9 +556,9 @@ export function WiringDiagram({ onClose }: { onClose: () => void }): ReactNode {
           Close
         </button>
       </header>
-      {isFurnace ? <FurnaceDiagram trace={trace} /> : <CondenserDiagram trace={trace} />}
+      {heatPump ? <HeatPumpDiagram /> : isFurnace ? <FurnaceDiagram trace={trace} /> : <CondenserDiagram trace={trace} />}
       <p className="legend">
-        {trace ? <><i className="lead-hot" /> has voltage right now.</> : "Drawn with power off, as on the unit's label."} <i className="lead-red" /> red lead <i className="lead-black" /> black
+        {heatPump ? 'Training control diagram. Probe the matching R, C, Y, O and W2 board terminals in the scene.' : trace ? <><i className="lead-hot" /> has voltage right now.</> : "Drawn with power off, as on the unit's label."} <i className="lead-red" /> red lead <i className="lead-black" /> black
         lead <i className="lead-clamp" /> clamp. Hover a terminal for its name.
       </p>
     </aside>

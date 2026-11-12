@@ -15,6 +15,11 @@ export interface TestPointDef {
 const def = <T extends Record<string, TestPointDef>>(points: T): T => points;
 
 export const TEST_POINTS = def({
+  HP_R: { label: 'Defrost board R (24 V supply)', short: 'R', node: 'LV_R', enclosure: 'controlBox' },
+  HP_C: { label: 'Defrost board C (common)', short: 'C', node: 'LV_C', enclosure: 'controlBox' },
+  HP_Y: { label: 'Defrost board Y input from thermostat', short: 'Y', node: 'LV_Y', enclosure: 'controlBox' },
+  HP_O: { label: 'Reversing valve O output (energized in cooling / defrost)', short: 'O', node: 'HP_O', enclosure: 'controlBox' },
+  HP_W2: { label: 'Defrost board W2 auxiliary heat output', short: 'W2', node: 'HP_W2', enclosure: 'controlBox' },
   DISC_L1_LINE: { label: 'Disconnect L1 line lug', short: 'L1 line', node: 'L1_LINE', enclosure: 'disconnect' },
   DISC_L2_LINE: { label: 'Disconnect L2 line lug', short: 'L2 line', node: 'L2_LINE', enclosure: 'disconnect' },
   DISC_L1_LOAD: { label: 'Disconnect L1 load lug', short: 'L1 load', node: 'L1_LOAD', enclosure: 'disconnect' },

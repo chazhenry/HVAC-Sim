@@ -73,9 +73,8 @@ cat <<'EOF'
 -------------------------------------------------------------------------------
 Next: put it live. On the machine with the hypercard.ai-homepage repo, run:
 
-  1. bash scripts/update-hvac.sh      # rebuilds public/hvac/ from GitHub
-  2. git add -A && git commit -m "Update HVAC-Sim" && git push
-  3. bash deploy2azure.sh             # publishes the website
+  1. bash# scripts/update-hvac.sh      # rebuilds public/hvac/ from GitHub
+  2. bash# deploy2azure.sh             # publishes the website
 
 Then hard-refresh https://hypercard.ai/hvac/ (Ctrl+Shift+R).
 

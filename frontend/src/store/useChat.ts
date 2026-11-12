@@ -2,11 +2,13 @@ import { create } from 'zustand';
 import { api } from '../api/client';
 import { chatState } from '../ui/observations';
 import { useSim } from './useSim';
+import { isPowerCommand, usePowerCommands } from './usePowerCommands';
 
 export interface ChatMessage {
   id: number;
   role: 'user' | 'assistant' | 'error';
   content: string;
+  kind?: 'power_command';
 }
 
 const HISTORY_KEY = 'hvac-sim.chat-prompts';
@@ -53,12 +55,26 @@ export const useChat = create<ChatState>()((set, get) => ({
     const sim = useSim.getState();
     const { sessionId } = sim;
     if (!message || sessionId === null) return;
-    // A reply still pending for a job that has since been left does not block the new one.
-    if (get().pending && get().sessionId === sessionId) return;
-
     const fresh = get().sessionId !== sessionId;
     const earlier = fresh ? [] : get().messages;
     const prompts = [message, ...get().prompts.filter((p) => p !== message)].slice(0, HISTORY_LIMIT);
+    if (isPowerCommand(message)) {
+      const content = usePowerCommands.getState().execute(message);
+      savePrompts(prompts);
+      set({
+        sessionId,
+        pending: fresh ? false : get().pending,
+        prompts,
+        messages: [...earlier,
+          { id: ++nextId, role: 'user', content: message, kind: 'power_command' },
+          { id: ++nextId, role: 'assistant', content, kind: 'power_command' },
+        ],
+      });
+      return;
+    }
+    // A reply still pending for a job that has since been left does not block the new one.
+    if (get().pending && get().sessionId === sessionId) return;
+
     savePrompts(prompts);
     set({
       sessionId,
@@ -68,7 +84,7 @@ export const useChat = create<ChatState>()((set, get) => ({
     });
 
     const history = earlier
-      .filter((m): m is ChatMessage & { role: 'user' | 'assistant' } => m.role !== 'error')
+      .filter((m): m is ChatMessage & { role: 'user' | 'assistant' } => m.role !== 'error' && m.kind !== 'power_command')
       .map(({ role, content }) => ({ role, content }));
     let reply: ChatMessage;
     try {

@@ -1,6 +1,9 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useChat } from '../store/useChat';
 import { useSim } from '../store/useSim';
+import { JOB_LOG_TOAST_CLOSED } from './JobLogToasts';
+import { ChatMessage } from './ChatMessage';
+import { isPowerCommand } from '../store/usePowerCommands';
 
 function Log(): ReactNode {
   const log = useSim((s) => s.log);
@@ -44,6 +47,8 @@ function Chat(): ReactNode {
   const messages = chatJob === jobId ? all : [];
 
   const [draft, setDraft] = useState('');
+  const commandDraft = isPowerCommand(draft);
+  const waiting = pending && !commandDraft;
   /** Position in the prompt history; -1 is the text being typed now. */
   const [recall, setRecall] = useState(-1);
   const typed = useRef('');
@@ -60,7 +65,7 @@ function Chat(): ReactNode {
   }, [pending]);
 
   const submit = (): void => {
-    if (pending || !draft.trim()) return;
+    if (waiting || !draft.trim()) return;
     void send(draft);
     setDraft('');
     setRecall(-1);
@@ -94,15 +99,15 @@ function Chat(): ReactNode {
         {messages.length === 0 && (
           <p className="empty">
             Ask the tutor about this job. It sees what you see: the work order, your readings and the job log. Ctrl+↑ and
-            Ctrl+↓ recall earlier prompts.
+            Ctrl+↓ recall earlier prompts. Use /l to toggle cursor part labels.
           </p>
         )}
         {messages.map((m) => (
-          <p key={m.id} className={`bubble ${m.role}`}>
-            {m.content}
-          </p>
+          <div key={m.id} className={`bubble ${m.role}${m.kind === 'power_command' ? ' power-command' : ''}`}>
+            <ChatMessage content={m.content} />
+          </div>
         ))}
-        {pending && <p className="bubble assistant thinking">Thinking…</p>}
+        {pending && <p className="bubble assistant thinking"><Spinner /> Thinking…</p>}
         <div ref={end} />
       </div>
       <div className="chat-input">
@@ -110,9 +115,8 @@ function Chat(): ReactNode {
           ref={box}
           rows={2}
           value={draft}
-          disabled={pending}
           maxLength={2000}
-          placeholder={pending ? 'Waiting for the tutor…' : 'Ask the tutor…'}
+          placeholder={pending ? 'Tutor is thinking… /l toggles cursor labels.' : 'Ask the tutor… / for commands'}
           aria-label="Message to the tutor"
           onChange={(e) => {
             setDraft(e.target.value);
@@ -123,12 +127,12 @@ function Chat(): ReactNode {
         <button
           type="button"
           className="chat-send"
-          aria-label={pending ? 'Waiting for reply' : 'Send'}
-          title={pending ? 'Waiting for reply' : 'Send (Enter)'}
-          disabled={pending || !draft.trim()}
+          aria-label={waiting ? 'Waiting for reply' : commandDraft ? 'Run power command' : 'Send'}
+          title={waiting ? 'Waiting for reply' : commandDraft ? 'Run power command (Enter)' : 'Send (Enter)'}
+          disabled={waiting || !draft.trim()}
           onClick={submit}
         >
-          {pending ? <Spinner /> : <SendIcon />}
+          {waiting ? <Spinner /> : <SendIcon />}
         </button>
       </div>
     </div>
@@ -140,6 +144,13 @@ type Tab = 'chat' | 'log';
 /** Bottom of the right-hand pane: the tutor chat and the job log, as tabs. */
 export function ChatPanel(): ReactNode {
   const [tab, setTab] = useState<Tab>('chat');
+  const [sparkle, setSparkle] = useState<number | null>(null);
+  const sparkleId = useRef(0);
+  useEffect(() => {
+    const flash = (): void => setSparkle(++sparkleId.current);
+    window.addEventListener(JOB_LOG_TOAST_CLOSED, flash);
+    return () => window.removeEventListener(JOB_LOG_TOAST_CLOSED, flash);
+  }, []);
   const logCount = useSim((s) => s.log.length);
   const [seen, setSeen] = useState(logCount);
   useEffect(() => {
@@ -153,8 +164,15 @@ export function ChatPanel(): ReactNode {
         <button type="button" role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? 'on' : ''} onClick={() => setTab('chat')}>
           Chat
         </button>
-        <button type="button" role="tab" aria-selected={tab === 'log'} className={tab === 'log' ? 'on' : ''} onClick={() => setTab('log')}>
+        <button id="job-log-tab" type="button" role="tab" aria-selected={tab === 'log'} className={tab === 'log' ? 'on' : ''} onClick={() => setTab('log')}>
           Job Log
+          <span className="job-log-sparkle-slot" aria-hidden="true">
+            {sparkle !== null && <svg key={sparkle} className="job-log-sparkle" viewBox="0 0 24 24"
+              onAnimationEnd={() => setSparkle(null)}>
+              <path d="m10 3 2.5 6.5L19 12l-6.5 2.5L10 21l-2.5-6.5L1 12l6.5-2.5Z" />
+              <path d="m20 1 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z" />
+            </svg>}
+          </span>
           {unread > 0 && <span className="badge">{unread}</span>}
         </button>
       </div>

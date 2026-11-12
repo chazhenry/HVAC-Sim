@@ -116,9 +116,9 @@ export function Disconnect(): ReactNode {
         </mesh>
       </group>
 
-      {/* Whip to the unit */}
+      {/* Keep the power whip above the refrigerant lines and service valves. */}
       <Tube
-        points={[[bx, 0.98, -0.65], [1.0, 0.5, -0.5], [0.86, 0.26, 0.0], [0.62, 0.42, 0.3], [0.437, 0.46, 0.34]]}
+        points={[[bx, 0.98, -0.65], [1.0, 0.76, -0.5], [0.86, 0.62, 0.0], [0.62, 0.52, 0.3], [0.437, 0.46, 0.34]]}
         radius={0.014}
         color="#6c7075"
         metalness={0.5}

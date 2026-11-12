@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from .exam import (
@@ -38,6 +38,7 @@ from .models import (
 from .scenarios import DIAGNOSES, DIAGNOSIS_BY_ID, SCENARIO_BY_ID, SCENARIOS, Scenario
 from .store import SessionRow, SessionStore
 from .tutor import ChatRequest, ChatResponse, UsageLimiter, build_messages
+from .visits import VISITS_ADMIN_IPS, VisitEntry, VisitRequest, VisitsPage, locate_visit
 
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "hvac_sim.db"
 DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -79,6 +80,40 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.post("/api/visits", status_code=202)
+    def track_visit(body: VisitRequest, request: Request, tasks: BackgroundTasks) -> dict[str, str]:
+        # Uvicorn resolves forwarding only from trusted proxies. Never accept an IP in the body.
+        ip = request.client.host if request.client else "unknown"
+        # Exclude administrators from all analytics events, including future activity events.
+        if ip in VISITS_ADMIN_IPS:
+            return {"status": "excluded"}
+        visit_id = str(body.visit_id)
+        if store.record_visit(visit_id, ip, body.app_version, body.event, body.user):
+            tasks.add_task(locate_visit, store, visit_id, ip)
+        return {"status": "accepted"}
+
+    def can_browse_visits(request: Request) -> bool:
+        return request.client is not None and request.client.host in VISITS_ADMIN_IPS
+
+    @app.get("/api/visits/access")
+    def visits_access(request: Request, response: Response) -> dict[str, bool]:
+        response.headers["Cache-Control"] = "no-store"
+        return {"allowed": can_browse_visits(request)}
+
+    @app.get("/api/visits", response_model=VisitsPage)
+    def browse_visits(
+        request: Request,
+        response: Response,
+        search: str = Query(default="", max_length=200),
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+    ) -> VisitsPage:
+        if not can_browse_visits(request):
+            raise HTTPException(status_code=403, detail="Visit log access denied")
+        response.headers["Cache-Control"] = "no-store"
+        items, total = store.browse_visits(search.strip(), limit, offset)
+        return VisitsPage(items=[VisitEntry(**item) for item in items], total=total, offset=offset, limit=limit)
 
     @app.get("/api/catalog", response_model=CatalogResponse)
     def catalog() -> CatalogResponse:

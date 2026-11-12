@@ -19,6 +19,19 @@ CREATE TABLE IF NOT EXISTS sessions (
     score       INTEGER,
     result_json TEXT
 );
+CREATE TABLE IF NOT EXISTS visits (
+    id          TEXT PRIMARY KEY,
+    visited_at  TEXT NOT NULL,
+    ip          TEXT NOT NULL,
+    city        TEXT,
+    state       TEXT,
+    country     TEXT,
+    app_version TEXT NOT NULL,
+    event       TEXT NOT NULL DEFAULT 'home',
+    user        TEXT
+);
+CREATE INDEX IF NOT EXISTS visits_ip_time ON visits (ip, visited_at);
+CREATE INDEX IF NOT EXISTS visits_time ON visits (visited_at DESC, id DESC);
 """
 
 
@@ -43,6 +56,54 @@ class SessionStore:
         self._db.row_factory = sqlite3.Row
         with self._lock, self._db:
             self._db.executescript(SCHEMA)
+            # Upgrade existing installations without losing their recorded visits.
+            self._db.execute("BEGIN IMMEDIATE")
+            columns = {row["name"] for row in self._db.execute("PRAGMA table_info(visits)")}
+            if "event" not in columns:
+                self._db.execute("ALTER TABLE visits ADD COLUMN event TEXT NOT NULL DEFAULT 'home'")
+            if "user" not in columns:
+                self._db.execute("ALTER TABLE visits ADD COLUMN user TEXT")
+
+    def record_visit(self, visit_id: str, ip: str, app_version: str, event: str = "home", user: str | None = None) -> bool:
+        """Persist before geolocation; retrying a visit ID cannot count it twice."""
+        with self._lock, self._db:
+            cursor = self._db.execute(
+                "INSERT OR IGNORE INTO visits (id, visited_at, ip, app_version, event, user) VALUES (?, ?, ?, ?, ?, ?)",
+                (visit_id, _now(), ip, app_version, event, user),
+            )
+        return cursor.rowcount == 1
+
+    def browse_visits(self, search: str, limit: int, offset: int) -> tuple[list[dict], int]:
+        # Literal substring matching across visible fields; all input is parameterized.
+        where = (
+            "WHERE instr(lower(ip || ' ' || COALESCE(city, '') || ' ' || "
+            "COALESCE(state, '') || ' ' || COALESCE(country, '') || ' ' || "
+            "app_version || ' ' || visited_at || ' ' || event || ' ' || COALESCE(user, '')), lower(?)) > 0"
+        )
+        with self._lock:
+            total = self._db.execute("SELECT COUNT(*) FROM visits " + where, (search,)).fetchone()[0]
+            rows = self._db.execute(
+                "SELECT * FROM visits " + where + " ORDER BY visited_at DESC, id DESC LIMIT ? OFFSET ?",
+                (search, limit, offset),
+            ).fetchall()
+        return [dict(row) for row in rows], total
+
+    def recent_location(self, ip: str, since: str) -> dict[str, str | None] | None:
+        with self._lock:
+            row = self._db.execute(
+                "SELECT city, state, country FROM visits "
+                "WHERE ip = ? AND visited_at >= ? AND country IS NOT NULL "
+                "ORDER BY visited_at DESC LIMIT 1",
+                (ip, since),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def locate_visit(self, visit_id: str, location: dict[str, str | None]) -> None:
+        with self._lock, self._db:
+            self._db.execute(
+                "UPDATE visits SET city = ?, state = ?, country = ? WHERE id = ?",
+                (location["city"], location["state"], location["country"], visit_id),
+            )
 
     def create(self, scenario_id: str) -> SessionRow:
         session_id = uuid.uuid4().hex

@@ -95,6 +95,11 @@ can see and has measured (`frontend/src/ui/observations.ts`). The tutor is never
 key or the unit's hidden parameters, so it coaches from the readings and cannot leak the fault.
 Usage is capped per job and per minute.
 
+Chat entries beginning with `/` are local `power_command` entries and are not sent
+to the tutor. `/` lists available commands. `/l` toggles list mode: the exact footer
+hover label follows the cursor beside its tool icon. Commands also work while a
+tutor reply is pending, and remain available in prompt history.
+
 ## Adding a scenario
 
 Add a `Scenario` to `backend/app/scenarios.py`: override the `UnitParams` fields that describe

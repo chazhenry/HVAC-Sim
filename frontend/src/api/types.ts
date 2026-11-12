@@ -240,3 +240,22 @@ export interface GradeResponse {
   breakdown: ScoreLine[];
   explanation: string;
 }
+
+export interface VisitEntry {
+  id: string;
+  visitedAt: string;
+  ip: string;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  appVersion: string;
+  event: string;
+  user: string | null;
+}
+
+export interface VisitsPage {
+  items: VisitEntry[];
+  total: number;
+  offset: number;
+  limit: number;
+}

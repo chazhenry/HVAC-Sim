@@ -58,13 +58,65 @@ last step has to happen there.
 `publish-frontend.sh` is the alternative for when the website repo is checked out on the same
 machine: it builds the frontend and copies it straight into `<HOMEPAGE_REPO>/public/hvac/`.
 
+## Simulator page visits
+
+The backend already uses SQLite. `POST /api/visits` records page visits in the same
+database as training sessions; no separate flat file or database service is needed.
+The main page displays an invited guest sign-in modal on each page load. The entered
+name is saved in browser localStorage under `hvac-sim.guest-name` and prefills the
+modal on return visits. After the guest confirms their name, the frontend sends
+`{ "visitId": "<UUID>", "appVersion": "26.11.11", "event": "home", "user": "Guest name" }`
+once for that page load. React re-renders do not count as visits. Repeating a request
+with the same visit ID does not count twice. Names are self-reported.
+
+The `visits` table contains `id`, `visited_at` (UTC), `ip`, `city`, `state`, `country`,
+`app_version`, `event`, and `user`. Page loads use `home`; future activity can use other event
+names through the same endpoint. Existing databases automatically receive the column,
+with existing visits marked `home`. The `user` column is also added automatically;
+older records without a guest name remain NULL. In production the database lives at `/var/lib/<SERVICE_NAME>/hvac_sim.db`
+(default `/var/lib/hvac-sim/hvac_sim.db`), survives releases, and is configured by
+`HVAC_SIM_DB`. Development defaults to `backend/hvac_sim.db`.
+
+IP addresses come from the connection as resolved by Uvicorn's trusted proxy
+handling, never from the browser's request body. Deployment configures this app's
+nginx site to restore `CF-Connecting-IP` only from a local Cloudflare Tunnel
+connector (`127.0.0.1` or `::1`). Existing sites receive these directives without
+replacing certbot TLS settings; nginx configuration is checked before reloading.
+If cloudflared runs in a container or on another host, configure its specific trusted
+source address in this app's nginx site instead. Do not trust arbitrary public sources.
+
+City, state/region, and country are approximate IP locations retrieved server-side
+over HTTPS from [ipwho.is](https://ipwhois.io/documentation). Visitor IPs are sent to
+that provider; no API key is required. Known locations from recent visits by the
+same IP are reused. Local/private IPs and failed or rate-limited lookups retain
+NULL location fields, while the visit itself is still saved. The lookup runs after
+the API response, and analytics failures do not block the simulator.
+
+The gear button in the app's top-right corner appears only when the backend sees
+visitor IP `136.56.49.114` or localhost (`127.0.0.1`, `::1`, or IPv4-mapped
+`::ffff:127.0.0.1`). It opens a modal using 90% of the app viewport, with
+search, refresh, and pages of 50 visits. `GET /api/visits/access` reports whether
+the current IP is allowed; `GET /api/visits?search=&limit=50&offset=0` enforces the
+same IP restriction on every request. Responses are not cached. Other IPs receive
+HTTP 403 when attempting to read visits, even if they bypass the hidden button.
+Those allowed IPs are excluded from all visit/activity analytics: the tracking endpoint
+returns `{"status":"excluded"}` without saving a row or looking up their location.
+They retain access to browse the log. The User and Event columns are visible and searchable.
+
+To inspect records directly on the backend server with the SQLite CLI:
+
+```bash
+sudo sqlite3 -header -column /var/lib/hvac-sim/hvac_sim.db \
+  'SELECT visited_at, user, event, ip, city, state, country, app_version FROM visits ORDER BY visited_at DESC LIMIT 100;'
+```
+
 ## What the backend deploy touches on the server
 
 Only things it owns (shown for the default `SERVICE_NAME=hvac-sim`; another name changes every path
 and the user to match):
 
 - `/opt/hvac-sim` - code (`current`, `previous`) and a private Python venv
-- `/var/lib/hvac-sim` - the SQLite session database
+- `/var/lib/hvac-sim` - the SQLite session and visit database
 - `/etc/systemd/system/hvac-sim.service` - runs as system user `hvac-sim`,
   listening on `127.0.0.1:<APP_PORT>` only
 - `/etc/nginx/sites-available/hvac-sim` - a separate nginx site for `API_DOMAIN`

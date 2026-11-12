@@ -42,7 +42,6 @@ command -v nginx >/dev/null || die "nginx is not installed"
 if ! systemctl is-active --quiet "$NAME" && ss -ltnH 2>/dev/null | grep -qE "[:.]${PORT}\s"; then
     die "port ${PORT} is already used by another program; choose a different APP_PORT"
 fi
-
 # Never reuse a hostname another nginx site already serves.
 if [ ! -e "$SITE" ] && grep -rlsE "server_name[^;]*\b${DOMAIN//./\\.}\b" /etc/nginx/sites-enabled /etc/nginx/conf.d >/dev/null 2>&1; then
     die "${DOMAIN} is already served by another nginx site; choose a different API_DOMAIN"
@@ -118,5 +117,44 @@ else
         # Back out so a bad config can never take the other sites down.
         rm -f "$LINK" "$SITE"
         die "nginx rejected the new site; it was removed and nginx was not reloaded"
+    fi
+fi
+
+# Upgrade only our existing site, preserving certbot's TLS settings and other edits.
+if ! grep -Fq '# HVAC-Sim visitor IP forwarding' "$SITE"; then
+    SITE_BACKUP="$(mktemp -t hvac-sim-nginx-XXXXXX)"
+    cp -p "$SITE" "$SITE_BACKUP"
+    if ! python3 - "$SITE" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+site = Path(sys.argv[1])
+text = site.read_text()
+settings = """
+    # HVAC-Sim visitor IP forwarding
+    # Trust only a local cloudflared connector for CF-Connecting-IP.
+    set_real_ip_from 127.0.0.1;
+    set_real_ip_from ::1;
+    real_ip_header CF-Connecting-IP;
+"""
+updated, count = re.subn(r"(^\s*server_name\s+[^;]+;)", lambda m: m[0] + settings, text, flags=re.M)
+if count == 0:
+    raise SystemExit("Cannot find server_name in HVAC-Sim nginx site")
+site.write_text(updated)
+PY
+    then
+        cp -p "$SITE_BACKUP" "$SITE"
+        rm -f "$SITE_BACKUP"
+        die "could not configure visitor IP forwarding"
+    fi
+    if nginx -t; then
+        systemctl reload nginx
+        rm -f "$SITE_BACKUP"
+        say "visitor IP forwarding configured (existing TLS settings preserved)"
+    else
+        cp -p "$SITE_BACKUP" "$SITE"
+        rm -f "$SITE_BACKUP"
+        die "nginx rejected visitor IP forwarding; previous site restored"
     fi
 fi

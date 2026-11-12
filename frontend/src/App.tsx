@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { api } from './api/client';
 import { F_VIEWS } from './scene/furnaceLayout';
 import { VIEWS } from './scene/layout';
 import { Scene, useView } from './scene/Scene';
@@ -12,6 +13,9 @@ import { ThermostatWidget } from './ui/Thermostat';
 import { Toolbox } from './ui/Toolbox';
 import { toolCursor } from './ui/toolIcons';
 import { WiringDiagram } from './ui/WiringDiagram';
+import { VisitsAdmin } from './ui/VisitsAdmin';
+import { GuestSignIn } from './ui/GuestSignIn';
+import { CursorPartLabel } from './ui/CursorPartLabel';
 import { APP_VERSION } from './version';
 
 const TICK_SECONDS = 0.1;
@@ -68,6 +72,8 @@ export function App(): ReactNode {
   const sessionId = useSim((s) => s.sessionId);
   const [submitting, setSubmitting] = useState(false);
   const [diagram, setDiagram] = useState(false);
+  const [guest, setGuest] = useState<string | null>(null);
+  const signedIn = useRef(false);
   const pane = usePaneWidth();
 
   // Frame the right piece of equipment whenever a new job starts.
@@ -91,6 +97,17 @@ export function App(): ReactNode {
   }, [phase]);
 
   const inJob = phase === 'running' || phase === 'graded';
+  if (guest === null) {
+    return <div className="app">
+      <GuestSignIn onSignIn={(name) => {
+        if (signedIn.current) return;
+        signedIn.current = true;
+        setGuest(name);
+        // Submit once after the guest confirms their name; React renders cannot double-count.
+        void api.trackVisit(crypto.randomUUID(), APP_VERSION, 'home', name).catch(() => undefined);
+      }} />
+    </div>;
+  }
   return (
     <div className="app">
       {inJob && <TopBar onSubmit={() => setSubmitting(true)} onDiagram={() => setDiagram((v) => !v)} />}
@@ -99,6 +116,7 @@ export function App(): ReactNode {
         <div className="viewport" style={inJob ? { cursor: toolCursor(tool) } : undefined}>
           <Scene />
           {inJob && <HoverBar />}
+          {inJob && <CursorPartLabel />}
           {inJob && <StatusBar />}
           {inJob && <ThermostatWidget />}
           {inJob && diagram && <WiringDiagram onClose={() => setDiagram(false)} />}
@@ -110,6 +128,7 @@ export function App(): ReactNode {
       {phase === 'running' && submitting && <SubmitDialog onClose={() => setSubmitting(false)} />}
       {phase === 'graded' && <ResultDialog />}
       <JobLogToasts />
+      <VisitsAdmin />
     </div>
   );
 }

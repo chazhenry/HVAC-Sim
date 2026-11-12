@@ -10,6 +10,7 @@ import type {
   HintResponse,
   SessionResponse,
   SubmitRequest,
+  VisitsPage,
 } from './types';
 
 export class ApiError extends Error {
@@ -57,6 +58,12 @@ const post = (body?: unknown): RequestInit => ({
 });
 
 export const api = {
+  visitsAccess: () => request<{ allowed: boolean }>('/visits/access', { cache: 'no-store' }),
+  visits: (search: string, offset: number, limit: number, signal: AbortSignal) =>
+    request<VisitsPage>(`/visits?${new URLSearchParams({ search, offset: String(offset), limit: String(limit) })}`,
+      { cache: 'no-store', signal }),
+  trackVisit: (visitId: string, appVersion: string, event = 'home', user?: string) =>
+    request<{ status: string }>('/visits', { ...post({ visitId, appVersion, event, user }), keepalive: true }),
   catalog: () => request<CatalogResponse>('/catalog'),
   startSession: (scenarioId: string) => request<SessionResponse>('/sessions', post({ scenarioId })),
   hint: (sessionId: string) => request<HintResponse>(`/sessions/${sessionId}/hint`, post()),

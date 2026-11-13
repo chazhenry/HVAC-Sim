@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "faults": [
+    {
+      "id": "condenser.cap_herm",
+      "componentId": "system.outdoor.runCapacitor",
+      "unitType": "condenser",
+      "changes": [
+        {
+          "path": [
+            "capacitor",
+            "hermUf"
+          ],
+          "operation": "ratedFraction",
+          "ratingPath": [
+            "capacitor",
+            "ratedHermUf"
+          ],
+          "value": 0.1911111111111111
+        }
+      ]
+    },
+    {
+      "id": "condenser.cap_fan",
+      "componentId": "system.outdoor.runCapacitor",
+      "unitType": "condenser",
+      "changes": [
+        {
+          "path": [
+            "capacitor",
+            "fanUf"
+          ],
+          "operation": "ratedFraction",
+          "ratingPath": [
+            "capacitor",
+            "ratedFanUf"
+          ],
+          "value": 0.12
+        }
+      ]
+    },
+    {
+      "id": "condenser.contactor_coil",
+      "componentId": "system.outdoor.contactor",
+      "unitType": "condenser",
+      "changes": [
+        {
+          "path": [
+            "contactor",
+            "coilOhms"
+          ],
+          "operation": "set",
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "condenser.contactor_contacts",
+      "componentId": "system.outdoor.contactor",
+      "unitType": "condenser",
+      "changes": [
+        {
+          "path": [
+            "contactor",
+            "pole1Ohms"
+          ],
+          "operation": "set",
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "condenser.fan_motor",
+      "componentId": "system.outdoor.fanMotor",
+      "unitType": "condenser",
+      "changes": [
+        {
+          "path": [
+            "fanMotor",
+            "runOhms"
+          ],
+          "operation": "set",
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "condenser.blown_fuse",
+      "componentId": "system.outdoor.fuses",
+      "unitType": "condenser",
+      "changes": [
+        {
+          "path": [
+            "fuseL2Ok"
+          ],
+          "operation": "set",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": "condenser.low_charge",
+      "componentId": "system.outdoor.refrigerant",
+      "unitType": "condenser",
+      "changes": [
+        {
+          "path": [
+            "chargeFraction"
+          ],
+          "operation": "set",
+          "value": 0.72
+        }
+      ]
+    },
+    {
+      "id": "condenser.dirty_coil",
+      "componentId": "system.outdoor.coil",
+      "unitType": "condenser",
+      "changes": [
+        {
+          "path": [
+            "coilFouling"
+          ],
+          "operation": "set",
+          "value": 0.7
+        }
+      ]
+    },
+    {
+      "id": "furnace.f_flame_sensor",
+      "componentId": "system.indoor.flameSensor",
+      "unitType": "furnace",
+      "changes": [
+        {
+          "path": [
+            "flameSensorDirt"
+          ],
+          "operation": "set",
+          "value": 0.9
+        }
+      ]
+    },
+    {
+      "id": "furnace.f_igniter",
+      "componentId": "system.indoor.igniter",
+      "unitType": "furnace",
+      "changes": [
+        {
+          "path": [
+            "igniterOhms"
+          ],
+          "operation": "set",
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "furnace.f_inducer",
+      "componentId": "system.indoor.inducer",
+      "unitType": "furnace",
+      "changes": [
+        {
+          "path": [
+            "inducerOhms"
+          ],
+          "operation": "set",
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "furnace.f_pressure_switch",
+      "componentId": "system.indoor.pressureSwitch",
+      "unitType": "furnace",
+      "changes": [
+        {
+          "path": [
+            "pressureSwitchOk"
+          ],
+          "operation": "set",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": "furnace.f_gas_off",
+      "componentId": "system.indoor.gasSupply",
+      "unitType": "furnace",
+      "changes": [
+        {
+          "path": [
+            "gasCockOpen"
+          ],
+          "operation": "set",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": "furnace.f_gas_valve",
+      "componentId": "system.indoor.gasValve",
+      "unitType": "furnace",
+      "changes": [
+        {
+          "path": [
+            "gasValveCoilOhms"
+          ],
+          "operation": "set",
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "furnace.f_filter",
+      "componentId": "system.indoor.filter",
+      "unitType": "furnace",
+      "changes": [
+        {
+          "path": [
+            "filterDirt"
+          ],
+          "operation": "set",
+          "value": 0.9
+        }
+      ]
+    },
+    {
+      "id": "furnace.f_blower_cap",
+      "componentId": "system.indoor.blowerCapacitor",
+      "unitType": "furnace",
+      "changes": [
+        {
+          "path": [
+            "blowerCapUf"
+          ],
+          "operation": "set",
+          "value": 1.1
+        }
+      ]
+    },
+    {
+      "id": "furnace.f_lv_fuse",
+      "componentId": "system.indoor.lvFuse",
+      "unitType": "furnace",
+      "changes": [
+        {
+          "path": [
+            "fuseOk"
+          ],
+          "operation": "set",
+          "value": false
+        }
+      ]
+    }
+  ]
+}

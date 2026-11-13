@@ -117,8 +117,8 @@ export function createSim(unit: UnitParams, env: Environment, context: Equipment
     thermo: { headSatF: eq, suctSatF: eq, suctionLineF: env.outdoorF, liquidLineF: env.outdoorF },
     capCharged: false,
     service: initialService(),
-    context,
-    heatPump: context?.heatPump ? createHeatPump(context.heatPump, env.outdoorF) : null,
+    context: context ? structuredClone(context) : null,
+    heatPump: context?.heatPump ? createHeatPump(structuredClone(context.heatPump), env.outdoorF) : null,
   };
   const withSolution = { ...base, solution: undefined as unknown as AcSolution };
   withSolution.solution = solveAc(base.unit, switchState(withSolution));

@@ -150,7 +150,7 @@ export function createFurnace(unit: FurnaceParams, env: Environment): FurnaceSta
     unit: structuredClone(unit),
     env: { ...env },
     controls: { powerOn: true, doorClosed: true, calling: false },
-    board: IDLE_BOARD,
+    board: structuredClone(IDLE_BOARD),
     psClosed: false,
     limitOpen: false,
     inducerSpeed: 0,
@@ -201,7 +201,7 @@ interface Inputs {
 
 /** The control board's sequence of operation. */
 function stepBoard(prev: Board, input: Inputs, dt: number, events: FEvent[]): Board {
-  if (!input.powered) return IDLE_BOARD; // a power cycle clears everything, including lockout
+  if (!input.powered) return structuredClone(IDLE_BOARD); // a power cycle clears everything, including lockout
 
   const b: Board = { ...prev, timer: prev.timer + dt };
   const go = (phase: BoardPhase): void => {
@@ -408,5 +408,10 @@ export function stepFurnace(prev: FurnaceState, dt: number): FStepResult {
 
 /** Re-solve after the learner changes a switch or a part between ticks. */
 export function resolveFurnace(s: FurnaceState): FurnaceState {
-  return { ...s, solution: solveFurnace(s.unit, fSwitchState(s)) };
+  const solution = solveFurnace(s.unit, fSwitchState(s));
+  if (cabs(solution.v.L1_BD) > 100) return { ...s, solution };
+  // Dropping board power resets lockout and removes relay commands immediately,
+  // even when a switch is cycled between animation ticks. Motors still coast on ticks.
+  const off = { ...s, board: structuredClone(IDLE_BOARD), valveOpen: false, gasFlowing: false, flame: false };
+  return { ...off, solution: solveFurnace(off.unit, fSwitchState(off)) };
 }

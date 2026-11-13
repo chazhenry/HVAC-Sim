@@ -154,6 +154,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             furnace=scenario.furnace,
             environment=scenario.environment,
             context=body.context,
+            procedure_id=scenario.procedure_id,
         )
 
     @app.post("/api/sessions/{session_id}/hint", response_model=HintResponse)
@@ -175,6 +176,8 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         if final is None:
             raise HTTPException(status_code=422, detail="Final readings for this unit are missing")
         result = grade(scenario, body, row.hints_used)
+        if body.equipment_journal is not None:
+            store.save_journal(session_id, body.equipment_journal.model_dump_json(by_alias=True))
         store.finish(session_id, result.score, result.model_dump_json(by_alias=True))
         return result
 

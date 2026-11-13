@@ -1,0 +1,328 @@
+{
+  "schemaVersion": 1,
+  "assemblies": [
+    {
+      "id": "system.outdoor",
+      "parentId": null,
+      "label": "Outdoor unit"
+    },
+    {
+      "id": "system.outdoor.controlBox",
+      "parentId": "system.outdoor",
+      "label": "Outdoor electrical compartment"
+    },
+    {
+      "id": "system.outdoor.refrigerantCircuit",
+      "parentId": "system.outdoor",
+      "label": "Outdoor refrigerant circuit"
+    },
+    {
+      "id": "system.indoor",
+      "parentId": null,
+      "label": "Indoor unit"
+    },
+    {
+      "id": "system.indoor.burner",
+      "parentId": "system.indoor",
+      "label": "Burner compartment"
+    },
+    {
+      "id": "system.indoor.blowerCompartment",
+      "parentId": "system.indoor",
+      "label": "Blower compartment"
+    }
+  ],
+  "components": [
+    {
+      "id": "system.outdoor.runCapacitor",
+      "assemblyId": "system.outdoor.controlBox",
+      "unitType": "condenser",
+      "kind": "dualRunCapacitor",
+      "target": "capacitor",
+      "terminals": [
+        "CAP_C",
+        "CAP_HERM",
+        "CAP_FAN"
+      ]
+    },
+    {
+      "id": "system.outdoor.contactor",
+      "assemblyId": "system.outdoor.controlBox",
+      "unitType": "condenser",
+      "kind": "contactor",
+      "target": "contactor",
+      "terminals": [
+        "CONT_L1",
+        "CONT_L2",
+        "CONT_T1",
+        "CONT_T2",
+        "COIL_A",
+        "COIL_B"
+      ]
+    },
+    {
+      "id": "system.outdoor.fanMotor",
+      "assemblyId": "system.outdoor",
+      "unitType": "condenser",
+      "kind": "fanMotor",
+      "target": "fanMotor",
+      "terminals": [
+        "FAN_BLK",
+        "FAN_PUR",
+        "FAN_BRN"
+      ]
+    },
+    {
+      "id": "system.outdoor.fuses",
+      "assemblyId": "system.outdoor",
+      "unitType": "condenser",
+      "kind": "fuses",
+      "target": "fuses",
+      "terminals": [
+        "DISC_L1_LINE",
+        "DISC_L2_LINE",
+        "DISC_L1_LOAD",
+        "DISC_L2_LOAD"
+      ]
+    },
+    {
+      "id": "system.outdoor.coil",
+      "assemblyId": "system.outdoor.refrigerantCircuit",
+      "unitType": "condenser",
+      "kind": "coil",
+      "target": "coil",
+      "terminals": []
+    },
+    {
+      "id": "system.outdoor.compressor",
+      "assemblyId": "system.outdoor.refrigerantCircuit",
+      "unitType": "condenser",
+      "kind": "compressor",
+      "target": null,
+      "terminals": [
+        "COMP_C",
+        "COMP_S",
+        "COMP_R"
+      ]
+    },
+    {
+      "id": "system.outdoor.refrigerant",
+      "assemblyId": "system.outdoor.refrigerantCircuit",
+      "unitType": "condenser",
+      "kind": "refrigerant",
+      "target": null,
+      "terminals": []
+    },
+    {
+      "id": "system.outdoor.defrostBoard",
+      "assemblyId": "system.outdoor.controlBox",
+      "unitType": "condenser",
+      "kind": "controller",
+      "target": null,
+      "terminals": [
+        "HP_R",
+        "HP_C",
+        "HP_Y",
+        "HP_W2",
+        "LV_Y",
+        "LV_SW"
+      ]
+    },
+    {
+      "id": "system.outdoor.reversingValve",
+      "assemblyId": "system.outdoor.refrigerantCircuit",
+      "unitType": "condenser",
+      "kind": "valve",
+      "target": null,
+      "terminals": [
+        "HP_O"
+      ]
+    },
+    {
+      "id": "system.indoor.igniter",
+      "assemblyId": "system.indoor.burner",
+      "unitType": "furnace",
+      "kind": "igniter",
+      "target": "igniter",
+      "terminals": [
+        "F_IGN_H",
+        "F_IGN_N"
+      ]
+    },
+    {
+      "id": "system.indoor.flameSensor",
+      "assemblyId": "system.indoor.burner",
+      "unitType": "furnace",
+      "kind": "flameSensor",
+      "target": "flameSensor",
+      "terminals": [
+        "F_FS_ROD",
+        "F_BD_FS"
+      ]
+    },
+    {
+      "id": "system.indoor.pressureSwitch",
+      "assemblyId": "system.indoor.burner",
+      "unitType": "furnace",
+      "kind": "pressureSwitch",
+      "target": "pressureSwitch",
+      "terminals": [
+        "F_PS_A",
+        "F_PS_B"
+      ]
+    },
+    {
+      "id": "system.indoor.inducer",
+      "assemblyId": "system.indoor.burner",
+      "unitType": "furnace",
+      "kind": "inducer",
+      "target": "inducer",
+      "terminals": [
+        "F_IND_H",
+        "F_IND_N"
+      ]
+    },
+    {
+      "id": "system.indoor.gasValve",
+      "assemblyId": "system.indoor.burner",
+      "unitType": "furnace",
+      "kind": "valve",
+      "target": "gasValve",
+      "terminals": [
+        "F_GV_MV",
+        "F_GV_C"
+      ]
+    },
+    {
+      "id": "system.indoor.gasSupply",
+      "assemblyId": "system.indoor.burner",
+      "unitType": "furnace",
+      "kind": "gasSupply",
+      "target": "gasCock",
+      "terminals": []
+    },
+    {
+      "id": "system.indoor.blowerCapacitor",
+      "assemblyId": "system.indoor.blowerCompartment",
+      "unitType": "furnace",
+      "kind": "capacitor",
+      "target": "blowerCap",
+      "terminals": [
+        "F_BCAP_A",
+        "F_BCAP_B"
+      ]
+    },
+    {
+      "id": "system.indoor.blower",
+      "assemblyId": "system.indoor.blowerCompartment",
+      "unitType": "furnace",
+      "kind": "blower",
+      "target": "blowerMotor",
+      "terminals": [
+        "F_BLW_H",
+        "F_BLW_N"
+      ]
+    },
+    {
+      "id": "system.indoor.filter",
+      "assemblyId": "system.indoor.blowerCompartment",
+      "unitType": "furnace",
+      "kind": "filter",
+      "target": "filter",
+      "terminals": []
+    },
+    {
+      "id": "system.indoor.lvFuse",
+      "assemblyId": "system.indoor.blowerCompartment",
+      "unitType": "furnace",
+      "kind": "fuse",
+      "target": "fuse",
+      "terminals": [
+        "F_BD_SEC",
+        "F_BD_R"
+      ],
+      "measurementPairs": [
+        [
+          "F_BD_R",
+          "F_BD_C"
+        ],
+        [
+          "F_BD_SEC",
+          "F_BD_C"
+        ]
+      ]
+    },
+    {
+      "id": "system.indoor.limit",
+      "assemblyId": "system.indoor.burner",
+      "unitType": "furnace",
+      "kind": "limit",
+      "target": "limit",
+      "terminals": [
+        "F_LIM_A",
+        "F_LIM_B"
+      ]
+    },
+    {
+      "id": "system.indoor.controlBoard",
+      "assemblyId": "system.indoor.blowerCompartment",
+      "unitType": "furnace",
+      "kind": "controller",
+      "target": "board",
+      "terminals": [
+        "F_BD_L1",
+        "F_BD_N",
+        "F_BD_C",
+        "F_BD_W"
+      ]
+    },
+    {
+      "id": "system.indoor.coil",
+      "assemblyId": "system.indoor",
+      "unitType": "condenser",
+      "kind": "coil",
+      "target": null,
+      "terminals": []
+    },
+    {
+      "id": "system.indoor.serviceSwitch",
+      "assemblyId": "system.indoor",
+      "unitType": "furnace",
+      "kind": "switch",
+      "target": "serviceSwitch",
+      "terminals": [
+        "F_SW_LINE",
+        "F_SW_LOAD",
+        "F_SW_N",
+        "F_SW_GND"
+      ]
+    },
+    {
+      "id": "system.indoor.doorSwitch",
+      "assemblyId": "system.indoor",
+      "unitType": "furnace",
+      "kind": "interlock",
+      "target": "doorSwitch",
+      "terminals": [
+        "F_DS_IN",
+        "F_DS_OUT"
+      ]
+    },
+    {
+      "id": "system.indoor.burnerDoor",
+      "assemblyId": "system.indoor",
+      "unitType": "furnace",
+      "kind": "door",
+      "target": "burnerDoor",
+      "terminals": []
+    },
+    {
+      "id": "system.indoor.blowerDoor",
+      "assemblyId": "system.indoor",
+      "unitType": "furnace",
+      "kind": "door",
+      "target": "blowerDoor",
+      "terminals": []
+    }
+  ]
+}

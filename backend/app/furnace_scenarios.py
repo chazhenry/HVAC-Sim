@@ -30,6 +30,7 @@ FURNACE_DIAGNOSES: tuple[DiagnosisOption, ...] = tuple(
 FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
         id="f-orientation",
+        procedure_id="f-orientation-diagnosis",
         title="Orientation: healthy furnace",
         difficulty=Difficulty.intro,
         complaint=(
@@ -54,13 +55,15 @@ FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         id="f-flame-sensor",
+        procedure_id="f-flame-sensor-diagnosis",
         title="Lights, then shuts off in seconds",
         difficulty=Difficulty.easy,
         complaint=(
             "Furnace fires up, the burners run for a few seconds and go out. It tries a few times "
             "and then gives up. House is getting cold."
         ),
-        furnace=FurnaceParams(flame_sensor_dirt=0.9),
+        furnace=FurnaceParams(),
+        fault_ids=('furnace.f_flame_sensor',),
         environment=WINTER,
         diagnosis_id="f_flame_sensor",
         required_repair=RepairAction.clean_flame_sensor,
@@ -79,13 +82,15 @@ FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         id="f-igniter",
+        procedure_id="f-igniter-diagnosis",
         title="Inducer runs, never lights",
         difficulty=Difficulty.easy,
         complaint=(
             "Customer hears the small fan start and a click after a while, but there is never any "
             "heat. After a few minutes everything stops."
         ),
-        furnace=FurnaceParams(igniter_ohms=None),
+        furnace=FurnaceParams(),
+        fault_ids=('furnace.f_igniter',),
         environment=WINTER,
         diagnosis_id="f_igniter",
         required_repair=RepairAction.replace_igniter,
@@ -103,13 +108,15 @@ FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         id="f-inducer",
+        procedure_id="f-inducer-diagnosis",
         title="Nothing happens, LED flashing",
         difficulty=Difficulty.medium,
         complaint=(
             "Thermostat is calling for heat but the furnace just sits there. The customer noticed a "
             "light blinking behind the lower door."
         ),
-        furnace=FurnaceParams(inducer_ohms=None),
+        furnace=FurnaceParams(),
+        fault_ids=('furnace.f_inducer',),
         environment=WINTER,
         diagnosis_id="f_inducer",
         required_repair=RepairAction.replace_inducer,
@@ -128,13 +135,15 @@ FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         id="f-pressure-switch",
+        procedure_id="f-pressure-switch-diagnosis",
         title="Inducer runs forever, no ignition",
         difficulty=Difficulty.medium,
         complaint=(
             "The small exhaust fan runs and runs but the furnace never tries to light. Blinking "
             "light on the board."
         ),
-        furnace=FurnaceParams(pressure_switch_ok=False),
+        furnace=FurnaceParams(),
+        fault_ids=('furnace.f_pressure_switch',),
         environment=WINTER,
         diagnosis_id="f_pressure_switch",
         required_repair=RepairAction.replace_pressure_switch,
@@ -153,13 +162,15 @@ FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         id="f-gas-off",
+        procedure_id="f-gas-off-diagnosis",
         title="Igniter glows, no flame",
         difficulty=Difficulty.medium,
         complaint=(
             "No heat since the gas company changed the meter yesterday. Customer can see an orange "
             "glow through the door for a few seconds, then nothing."
         ),
-        furnace=FurnaceParams(gas_cock_open=False),
+        furnace=FurnaceParams(),
+        fault_ids=('furnace.f_gas_off',),
         environment=WINTER,
         diagnosis_id="f_gas_off",
         required_repair=RepairAction.open_gas_cock,
@@ -177,13 +188,15 @@ FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         id="f-gas-valve",
+        procedure_id="f-gas-valve-diagnosis",
         title="Glows and clicks, will not light",
         difficulty=Difficulty.hard,
         complaint=(
             "Furnace goes through the motions - fan, glow - but never lights. Another company "
             "already replaced the igniter last week."
         ),
-        furnace=FurnaceParams(gas_valve_coil_ohms=None),
+        furnace=FurnaceParams(),
+        fault_ids=('furnace.f_gas_valve',),
         environment=WINTER,
         diagnosis_id="f_gas_valve",
         required_repair=RepairAction.replace_gas_valve,
@@ -201,13 +214,15 @@ FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         id="f-filter",
+        procedure_id="f-filter-diagnosis",
         title="Short-cycling, weak airflow",
         difficulty=Difficulty.medium,
         complaint=(
             "Furnace runs for a minute, the burners shut off, the fan keeps blowing, then it starts "
             "over. Weak airflow from the registers."
         ),
-        furnace=FurnaceParams(filter_dirt=0.9),
+        furnace=FurnaceParams(),
+        fault_ids=('furnace.f_filter',),
         environment=WINTER,
         diagnosis_id="f_filter",
         required_repair=RepairAction.replace_filter,
@@ -225,13 +240,15 @@ FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         id="f-blower-cap",
+        procedure_id="f-blower-cap-diagnosis",
         title="Burners cut out, no air from vents",
         difficulty=Difficulty.hard,
         complaint=(
             "Furnace lights and burns but no air ever comes out of the registers. After a while the "
             "burners shut off. There is a humming noise from the bottom."
         ),
-        furnace=FurnaceParams(blower_cap_uf=1.1),
+        furnace=FurnaceParams(),
+        fault_ids=('furnace.f_blower_cap',),
         environment=WINTER,
         diagnosis_id="f_blower_cap",
         required_repair=RepairAction.replace_blower_capacitor,
@@ -249,13 +266,15 @@ FURNACE_SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         id="f-fuse",
+        procedure_id="f-fuse-diagnosis",
         title="Thermostat calls, furnace ignores it",
         difficulty=Difficulty.medium,
         complaint=(
             "No heat after the customer installed a new thermostat themselves. The furnace has "
             "power but does nothing at all."
         ),
-        furnace=FurnaceParams(fuse_ok=False),
+        furnace=FurnaceParams(),
+        fault_ids=('furnace.f_lv_fuse',),
         environment=WINTER,
         diagnosis_id="f_lv_fuse",
         required_repair=RepairAction.replace_lv_fuse,

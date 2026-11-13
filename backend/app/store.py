@@ -44,6 +44,11 @@ CREATE TABLE IF NOT EXISTS session_contexts (
     session_id TEXT PRIMARY KEY,
     config_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS session_journals (
+    session_id TEXT PRIMARY KEY,
+    schema_version INTEGER NOT NULL,
+    events_json TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS feedback (
     id TEXT PRIMARY KEY,
     reply_id TEXT NOT NULL,
@@ -87,6 +92,10 @@ class SessionStore:
                 self._db.execute("ALTER TABLE visits ADD COLUMN event TEXT NOT NULL DEFAULT 'home'")
             if "user" not in columns:
                 self._db.execute("ALTER TABLE visits ADD COLUMN user TEXT")
+
+    def save_journal(self, session_id: str, journal_json: str) -> None:
+        with self._lock, self._db:
+            self._db.execute("INSERT OR REPLACE INTO session_journals VALUES (?, 1, ?)", (session_id, journal_json))
 
     def set_context(self, session_id: str, config_json: str) -> None:
         with self._lock, self._db:

@@ -1,14 +1,17 @@
+import { applyFurnaceAction } from '../sim/equipment/furnaceActions';
+import { furnaceMeasurements } from '../sim/equipment/furnaceMeasurements';
 import { create } from 'zustand';
+import { applyEquipmentAction } from '../sim/equipment/actions';
+import { componentForTarget, componentForTerminal } from '../sim/equipment/registry';
+import type { EquipmentAction, EquipmentEvent, EquipmentJournal } from '../sim/equipment/types';
 import { api } from '../api/client';
 import type {
   CatalogResponse,
   EquipmentContext,
-  FurnaceParams,
   GradeResponse,
   RepairAction,
   ScenarioSummary,
   SubmitRequest,
-  UnitParams,
   UnitType,
 } from '../api/types';
 import {
@@ -50,61 +53,13 @@ import {
   pointInfo,
 } from '../sim/points';
 
-export type ToolId =
-  | 'hand'
-  | 'nutdriver'
-  | 'multimeter'
-  | 'clamp'
-  | 'ncv'
-  | 'gauges'
-  | 'tempclamp'
-  | 'discharge'
-  | 'hose'
-  | 'part_capacitor'
-  | 'part_contactor'
-  | 'part_fanmotor'
-  | 'part_fuses'
-  // furnace
-  | 'manometer'
-  | 'thermo'
-  | 'emery'
-  | 'part_igniter'
-  | 'part_flamesensor'
-  | 'part_pswitch'
-  | 'part_inducer'
-  | 'part_gasvalve'
-  | 'part_blowercap'
-  | 'part_filter'
-  | 'part_fuse3a'
-  | 'part_limit'
-  | 'part_board';
+export type { ToolId } from '../sim/equipment/types';
+import type { ToolId } from '../sim/equipment/types';
 
 export type PanelId = 'access' | 'louver' | 'top';
 export type PartTarget = 'capacitor' | 'contactor' | 'fanMotor' | 'fuses' | 'coil';
-export type FurnaceDoor = 'burner' | 'blower';
-export type ManometerTap = 'draft' | 'inlet' | 'manifold';
-export type FurnaceTarget =
-  | 'burnerDoor'
-  | 'blowerDoor'
-  | 'serviceSwitch'
-  | 'doorSwitch'
-  | 'gasCock'
-  | 'igniter'
-  | 'flameSensor'
-  | 'pressureSwitch'
-  | 'inducer'
-  | 'gasValve'
-  | 'blowerCap'
-  | 'blowerMotor'
-  | 'filter'
-  | 'fuse'
-  | 'board'
-  | 'limit'
-  | 'pressureTap'
-  | 'inletTap'
-  | 'manifoldTap'
-  | 'supplyDuct'
-  | 'returnDuct';
+export type { FurnaceDoor, ManometerTap, FurnaceTarget } from '../sim/equipment/types';
+import type { FurnaceDoor, ManometerTap, FurnaceTarget } from '../sim/equipment/types';
 export type Phase = 'loading' | 'menu' | 'running' | 'graded';
 export type LogKind = 'info' | 'sound' | 'warn' | 'danger' | 'good';
 
@@ -197,6 +152,7 @@ export interface AppState {
   scenario: ScenarioSummary | null;
   unitType: UnitType;
   context: EquipmentContext | null;
+  procedureId: string | null;
   /** Condenser simulation (null on a furnace job). */
   sim: SimState | null;
   /** Furnace simulation (null on a condenser job). */
@@ -230,6 +186,7 @@ export interface AppState {
   log: LogEntry[];
   hover: string | null;
   result: GradeResponse | null;
+  equipmentJournal: EquipmentJournal;
 
   loadCatalog: () => Promise<void>;
   startScenario: (id: string, context?: EquipmentContext) => Promise<void>;
@@ -329,6 +286,7 @@ const fresh = {
   log: [] as LogEntry[],
   hover: null,
   result: null,
+  equipmentJournal: { schemaVersion: 1, events: [] } as EquipmentJournal,
 };
 
 export const useSim = create<AppState>()((set, get) => {
@@ -346,15 +304,50 @@ export const useSim = create<AppState>()((set, get) => {
     set((s) => (s.repairs.includes(repair) ? {} : { repairs: [...s.repairs, repair] }));
   };
 
-  /** Apply a change to the condenser's physical parameters and re-solve the circuit. */
-  const patchUnit = (patch: (unit: UnitParams) => UnitParams, extra: Partial<SimState> = {}): void => {
-    const { sim } = get();
-    if (sim) set({ sim: resolve({ ...sim, ...extra, unit: patch(sim.unit) }) });
+  const appendEquipmentEvents = (events: readonly EquipmentEvent[]): void => {
+    if (!events.length) return;
+    set((state) => ({ equipmentJournal: { schemaVersion: 1, events: [...state.equipmentJournal.events, ...events] } }));
   };
 
-  const patchFurnace = (patch: Partial<FurnaceParams>, extra: Partial<FurnaceState> = {}): void => {
-    const { furnace } = get();
-    if (furnace) set({ furnace: resolveFurnace({ ...furnace, ...extra, unit: { ...furnace.unit, ...patch } }) });
+  const runEquipmentAction = (action: EquipmentAction): void => {
+    const state = get();
+    if (!state.sim) return;
+    const result = applyEquipmentAction({ sim: state.sim, panels: state.panels, doorOpen: state.doorOpen }, action);
+    set({ sim: result.sim });
+    appendEquipmentEvents(result.events);
+    for (const unsafe of result.violations) violation(unsafe);
+    for (const repair of result.repairs) addRepair(repair);
+    for (const message of result.messages) say(message.text, message.kind);
+  };
+
+  const recordEquipmentMeasurement = (force = true): void => {
+    const state = get();
+    const { sim, leads, meterMode } = state;
+    if (state.furnace) {
+      const events = furnaceMeasurements({ ...state, furnace: state.furnace }, state.leads, state.meterMode, state.clampAt);
+      // Keep changed readings from connected instruments, including transient ignition signals.
+      const fresh = events.filter((event) => {
+        const previous = [...state.equipmentJournal.events].reverse().find((item) => item.type === event.type && item.componentId === event.componentId
+          && item.channel === event.channel && JSON.stringify(item.terminals ?? []) === JSON.stringify(event.terminals ?? []));
+        const tolerance = event.unit === '°F' ? .5 : event.unit === 'A' ? .1 : .02;
+        return force || !previous || previous.safe !== event.safe || previous.status !== event.status
+          || (previous.value === undefined) !== (event.value === undefined)
+          || previous.value !== undefined && event.value !== undefined && Math.abs(previous.value - event.value) >= tolerance;
+      });
+      appendEquipmentEvents(fresh);
+      return;
+    }
+    if (!sim || !leads.red || !leads.black) return;
+    const component = componentForTerminal(leads.red);
+    if (!component || componentForTerminal(leads.black)?.id !== component.id) return;
+    const reading = activeReading(state);
+    if (reading.kind !== 'value' || (reading.unit !== 'V' && reading.unit !== 'µF')) return;
+    appendEquipmentEvents([{
+      type: meterMode === 'vac' ? 'measurement.voltage' : 'measurement.capacitance',
+      componentId: component.id, t: sim.t, value: reading.value, unit: reading.unit,
+      terminals: [leads.red, leads.black],
+      safe: reading.unit === 'V' || (!sim.controls.disconnectIn && !sim.capCharged),
+    }]);
   };
 
   const needTool = (wanted: ToolId, text: string): boolean => {
@@ -390,27 +383,6 @@ export const useSim = create<AppState>()((set, get) => {
     }));
   };
 
-  /** Swap a furnace part. Returns false if the wrong tool is in hand. */
-  const swapFurnacePart = (
-    tool: ToolId,
-    name: string,
-    repair: RepairAction,
-    patch: Partial<FurnaceParams>,
-    idle: string,
-  ): boolean => {
-    const { furnace } = get();
-    if (!furnace) return false;
-    if (get().tool !== tool) {
-      say(idle);
-      return false;
-    }
-    if (furnace.controls.powerOn) violation(`Replaced the ${name} with the power on`);
-    patchFurnace(patch);
-    addRepair(repair);
-    say(`Fitted a new ${name}.`, 'good');
-    return true;
-  };
-
   return {
     phase: 'loading',
     error: null,
@@ -420,6 +392,7 @@ export const useSim = create<AppState>()((set, get) => {
     scenario: null,
     unitType: 'condenser',
     context: null,
+    procedureId: null,
     sim: null,
     furnace: null,
     tstatStyle: savedStyle(),
@@ -440,12 +413,14 @@ export const useSim = create<AppState>()((set, get) => {
         const session = await api.startSession(id, context);
         const common = {
           ...fresh,
+          equipmentJournal: { schemaVersion: 1 as const, events: [] },
           busy: false,
           phase: 'running' as const,
           sessionId: session.sessionId,
           scenario: session.scenario,
           unitType: session.unitType,
           context: session.context,
+          procedureId: session.procedureId,
           tstat: { mode: 'off' as TstatMode, setpointF: Math.round(session.environment.setpointF) },
         };
         if (session.unitType === 'furnace') {
@@ -461,7 +436,7 @@ export const useSim = create<AppState>()((set, get) => {
     },
 
     backToMenu: () =>
-      set({ ...fresh, phase: 'menu', sim: null, furnace: null, sessionId: null, scenario: null, context: null }),
+      set({ ...fresh, equipmentJournal: { schemaVersion: 1, events: [] }, phase: 'menu', sim: null, furnace: null, sessionId: null, scenario: null, context: null, procedureId: null }),
 
     testDefrost: () => {
       const { sim } = get();
@@ -490,6 +465,7 @@ export const useSim = create<AppState>()((set, get) => {
         const { state, events } = stepFurnace(furnace, dt);
         set({ furnace: state });
         for (const e of events) say(F_EVENT_TEXT[e][1], F_EVENT_TEXT[e][0]);
+        if (Math.floor(state.t) !== Math.floor(furnace.t) || state.flame !== furnace.flame) recordEquipmentMeasurement(false);
       }
     },
 
@@ -499,6 +475,7 @@ export const useSim = create<AppState>()((set, get) => {
     setMeterMode: (meterMode) => {
       set({ meterMode });
       checkMeterSafety();
+      recordEquipmentMeasurement();
     },
 
     clearLeads: () => set({ leads: { red: null, black: null }, nextLead: 'red' }),
@@ -584,16 +561,7 @@ export const useSim = create<AppState>()((set, get) => {
 
     clickPullout: () => {
       if (!needTool('hand', 'Select the hand to pull or insert the disconnect.')) return;
-      const { sim } = get();
-      if (!sim) return;
-      const disconnectIn = !sim.controls.disconnectIn;
-      set({ sim: resolve({ ...sim, controls: { ...sim.controls, disconnectIn } }) });
-      say(
-        disconnectIn
-          ? 'Disconnect inserted - the unit has power.'
-          : 'Disconnect pulled - verify the unit is dead before touching anything.',
-        disconnectIn ? 'warn' : 'good',
-      );
+      runEquipmentAction({ type: 'disconnect.toggle' });
     },
 
     probe: (id) => {
@@ -609,6 +577,7 @@ export const useSim = create<AppState>()((set, get) => {
           if (placed.red !== null && placed.black !== null) {
             set((s) => ({ measurements: s.measurements + 1 }));
             checkMeterSafety();
+            recordEquipmentMeasurement();
           }
         }
       } else if (tool === 'ncv') {
@@ -626,7 +595,7 @@ export const useSim = create<AppState>()((set, get) => {
       if (!needTool('clamp', 'Select the clamp meter to measure current on a wire.')) return;
       const same = get().clampAt === id;
       set((s) => ({ clampAt: same ? null : id, measurements: s.measurements + (same ? 0 : 1) }));
-      if (!same) say(`Clamp meter around: ${clampLabel(id)}.`);
+      if (!same) { say(`Clamp meter around: ${clampLabel(id)}.`); recordEquipmentMeasurement(); }
     },
 
     clickPort: (side) => {
@@ -651,253 +620,22 @@ export const useSim = create<AppState>()((set, get) => {
     },
 
     clickPart: (target) => {
-      const { tool, sim, panels, doorOpen } = get();
-      if (!sim) return;
-      const powered = sim.controls.disconnectIn;
-
-      switch (target) {
-        case 'capacitor': {
-          if (tool === 'discharge') {
-            if (isHot(sim, 'CAP_C') || isHot(sim, 'CAP_HERM')) {
-              violation('Tried to discharge the capacitor with the circuit energised');
-              return;
-            }
-            set({ sim: { ...sim, capCharged: false } });
-            say('Capacitor discharged across its terminals.', 'good');
-          } else if (tool === 'part_capacitor') {
-            if (powered) violation('Replaced the capacitor with the disconnect in');
-            else if (sim.capCharged) violation('Handled the capacitor without discharging it first');
-            patchUnit(
-              (u) => ({
-                ...u,
-                capacitor: {
-                  ...u.capacitor,
-                  hermUf: u.capacitor.ratedHermUf * 1.008,
-                  fanUf: u.capacitor.ratedFanUf * 0.996,
-                },
-              }),
-              { capCharged: false },
-            );
-            addRepair('replace_capacitor');
-            say(`Fitted a new ${sim.unit.capacitor.ratedHermUf}/${sim.unit.capacitor.ratedFanUf} uF dual run capacitor.`, 'good');
-          } else {
-            say('Dual run capacitor. Use the discharge tool, the meter, or a new capacitor from the parts bin.');
-          }
-          return;
-        }
-        case 'contactor': {
-          if (tool !== 'part_contactor') {
-            say('Contactor. Probe its terminals with the meter, or fit a new one from the parts bin.');
-            return;
-          }
-          if (powered) violation('Replaced the contactor with the disconnect in');
-          patchUnit((u) => ({ ...u, contactor: { coilOhms: 12.4, pole1Ohms: 0.01, pole2Ohms: 0.01 } }));
-          addRepair('replace_contactor');
-          say('Fitted a new 2-pole 30 A contactor.', 'good');
-          return;
-        }
-        case 'fanMotor': {
-          if (tool !== 'part_fanmotor') {
-            say('Condenser fan motor. Its leads are tested in the control box.');
-            return;
-          }
-          if (panels.top) {
-            say('Swing the fan top up with the nut driver before changing the motor.');
-            return;
-          }
-          if (powered) violation('Replaced the fan motor with the disconnect in');
-          patchUnit((u) => ({
-            ...u,
-            fanMotor: { ...u.fanMotor, runOhms: 38.5, auxOhms: 61.2, seized: false },
-          }));
-          addRepair('replace_fan_motor');
-          say('Fitted a new condenser fan motor.', 'good');
-          return;
-        }
-        case 'fuses': {
-          if (tool !== 'part_fuses') return;
-          if (!doorOpen || powered) {
-            say('Open the disconnect and pull it out to get at the fuses.');
-            return;
-          }
-          patchUnit((u) => ({ ...u, fuseL1Ok: true, fuseL2Ok: true }));
-          addRepair('replace_fuses');
-          say('Fitted two new 30 A fuses.', 'good');
-          return;
-        }
-        case 'coil': {
-          if (tool !== 'hose') {
-            say('Condenser coil. Use the coil cleaner and hose to wash it.');
-            return;
-          }
-          if (panels.louver) {
-            say('Remove the front louver panel with the nut driver to get at the coil.');
-            return;
-          }
-          if (powered) violation('Washed the coil with the disconnect in');
-          patchUnit((u) => ({ ...u, coilFouling: 0 }));
-          addRepair('clean_coil');
-          say('Coil cleaned and rinsed from the inside out.', 'good');
-          return;
-        }
-      }
+      const component = componentForTarget('condenser', target);
+      if (component) runEquipmentAction({ type: 'component.use', componentId: component.id, tool: get().tool });
     },
 
     clickFurnace: (target) => {
-      const { tool, furnace, fdoors } = get();
-      if (!furnace) return;
-      const powered = furnace.controls.powerOn;
-      const setControls = (controls: Partial<FurnaceState['controls']>): void => {
-        const f = get().furnace;
-        if (f) set({ furnace: resolveFurnace({ ...f, controls: { ...f.controls, ...controls } }) });
-      };
-
-      switch (target) {
-        case 'burnerDoor':
-        case 'blowerDoor': {
-          const door: FurnaceDoor = target === 'burnerDoor' ? 'burner' : 'blower';
-          if (!needTool('hand', 'Furnace doors lift off by hand - select the hand.')) return;
-          const fitted = !fdoors[door];
-          set((s) => ({ fdoors: { ...s.fdoors, [door]: fitted } }));
-          if (fitted) dropLeadsIn(door);
-          if (door === 'blower') {
-            if (fitted) set({ doorSwitchTaped: false });
-            setControls({ doorClosed: fitted });
-            say(
-              fitted
-                ? 'Refitted the blower door. The door switch is pressed in again.'
-                : 'Lifted off the blower door. The door switch pops out and cuts power to the furnace.',
-              fitted ? 'info' : 'warn',
-            );
-          } else say(fitted ? 'Refitted the burner door.' : 'Lifted off the burner door.');
-          return;
-        }
-        case 'serviceSwitch': {
-          if (!needTool('hand', 'Select the hand to flip the service switch.')) return;
-          setControls({ powerOn: !powered });
-          say(
-            powered ? 'Service switch OFF - verify the furnace is dead before touching anything.' : 'Service switch ON.',
-            powered ? 'good' : 'warn',
-          );
-          return;
-        }
-        case 'doorSwitch': {
-          if (!needTool('hand', 'Select the hand to hold the door switch in.')) return;
-          const taped = !get().doorSwitchTaped;
-          set({ doorSwitchTaped: taped });
-          setControls({ doorClosed: taped });
-          say(
-            taped
-              ? 'Taped the door switch down so the furnace can run with the door off. Live parts are exposed.'
-              : 'Removed the tape from the door switch.',
-            taped ? 'warn' : 'info',
-          );
-          return;
-        }
-        case 'gasCock': {
-          if (!needTool('hand', 'Gas shut-off valve. Select the hand to turn it.')) return;
-          const open = !furnace.unit.gasCockOpen;
-          patchFurnace({ gasCockOpen: open });
-          if (open) addRepair('open_gas_cock');
-          say(open ? 'Gas cock opened - handle in line with the pipe.' : 'Gas cock closed - handle across the pipe.');
-          return;
-        }
-        case 'igniter':
-          swapFurnacePart('part_igniter', 'hot-surface igniter', 'replace_igniter', { igniterOhms: 52 },
-            'Hot-surface igniter. Never touch the element. Test it at its plug.');
-          return;
-        case 'flameSensor': {
-          if (tool === 'emery') {
-            if (powered) violation('Pulled the flame sensor with the power on');
-            patchFurnace({ flameSensorDirt: 0.03 });
-            addRepair('clean_flame_sensor');
-            say('Pulled the flame sensor and polished the rod back to bright metal.', 'good');
-          } else {
-            swapFurnacePart('part_flamesensor', 'flame sensor', 'replace_flame_sensor', { flameSensorDirt: 0.02 },
-              'Flame sensor rod. Read its signal in microamps, clean it with the abrasive pad.');
-          }
-          return;
-        }
-        case 'pressureSwitch':
-          swapFurnacePart('part_pswitch', 'pressure switch', 'replace_pressure_switch', { pressureSwitchOk: true },
-            'Pressure switch. Proves the inducer is moving flue gas before ignition is allowed.');
-          return;
-        case 'inducer':
-          swapFurnacePart('part_inducer', 'inducer assembly', 'replace_inducer', { inducerOhms: 28.4 },
-            'Inducer (draft) motor. Test for 120 V at its leads.');
-          return;
-        case 'gasValve': {
-          const gasOn = furnace.unit.gasCockOpen;
-          if (swapFurnacePart('part_gasvalve', 'gas valve', 'replace_gas_valve', { gasValveCoilOhms: 47.5 },
-            'Gas valve. 24 V across MV and C opens it. Pressure taps are on its face.') && gasOn) {
-            violation('Replaced the gas valve with the gas supply on');
-          }
-          return;
-        }
-        case 'blowerCap': {
-          if (tool === 'discharge') {
-            if (fIsHot(furnace, 'F_BCAP_A')) {
-              violation('Tried to discharge the capacitor with the circuit energised');
-              return;
-            }
-            set({ furnace: { ...furnace, capCharged: false } });
-            say('Blower capacitor discharged across its terminals.', 'good');
-            return;
-          }
-          const charged = furnace.capCharged;
-          if (swapFurnacePart('part_blowercap', 'blower capacitor', 'replace_blower_capacitor',
-            { blowerCapUf: furnace.unit.ratedBlowerCapUf * 1.01 }, 'Blower run capacitor - 7.5 uF 370 V.')) {
-            if (charged && !powered) violation('Handled the capacitor without discharging it first');
-            const f = get().furnace;
-            if (f) set({ furnace: { ...f, capCharged: false } });
-          }
-          return;
-        }
-        case 'blowerMotor':
-          say('Blower motor and wheel. Its leads and run capacitor are tested in this compartment.');
-          return;
-        case 'filter': {
-          if (tool !== 'part_filter') {
-            say(furnace.unit.filterDirt > 0.5 ? 'Air filter - grey and matted with dust.' : 'Air filter - looks clean.');
-            return;
-          }
-          patchFurnace({ filterDirt: 0.05 });
-          addRepair('replace_filter');
-          say('Slid in a new filter, arrow pointing toward the furnace.', 'good');
-          return;
-        }
-        case 'fuse':
-          swapFurnacePart('part_fuse3a', '3 A fuse', 'replace_lv_fuse', { fuseOk: true },
-            '3 A automotive-style fuse protecting the 24 V circuit.');
-          return;
-        case 'limit':
-          swapFurnacePart('part_limit', 'high-limit switch', 'replace_limit_switch', { limitOk: true },
-            'High-limit switch. Opens if the heat exchanger overheats.');
-          return;
-        case 'board':
-          swapFurnacePart('part_board', 'control board', 'replace_control_board', {},
-            'Integrated furnace control. The LED shows status and fault codes.');
-          return;
-        case 'pressureTap':
-        case 'inletTap':
-        case 'manifoldTap': {
-          if (!needTool('manometer', 'Select the manometer to read pressure here.')) return;
-          const tap: ManometerTap = target === 'pressureTap' ? 'draft' : target === 'inletTap' ? 'inlet' : 'manifold';
-          const same = get().manoAt === tap;
-          set((s) => ({ manoAt: same ? null : tap, measurements: s.measurements + (same ? 0 : 1) }));
-          if (!same) say(`Manometer connected: ${tap === 'draft' ? 'pressure switch tap' : `gas valve ${tap} tap`}.`);
-          return;
-        }
-        case 'supplyDuct':
-        case 'returnDuct': {
-          if (!needTool('thermo', 'Select the temperature probes to measure air temperature here.')) return;
-          const side = target === 'supplyDuct' ? 'supply' : 'return';
-          const on = !get().probes[side];
-          set((s) => ({ probes: { ...s.probes, [side]: on }, measurements: s.measurements + (on ? 1 : 0) }));
-          say(`Temperature probe ${on ? 'in' : 'out of'} the ${side} air.`);
-          return;
-        }
-      }
+      const state = get();
+      if (!state.furnace) return;
+      const result = applyFurnaceAction({ ...state, furnace: state.furnace }, { type: 'furnace.use', target, tool: state.tool });
+      set({ furnace: result.furnace, fdoors: result.fdoors, doorSwitchTaped: result.doorSwitchTaped,
+        manoAt: result.manoAt, probes: result.probes, measurements: state.measurements + result.measurements });
+      for (const door of result.dropLeads) dropLeadsIn(door);
+      appendEquipmentEvents(result.events);
+      for (const unsafe of result.violations) violation(unsafe);
+      for (const repair of result.repairs) addRepair(repair);
+      for (const message of result.messages) say(message.text, message.kind);
+      recordEquipmentMeasurement();
     },
 
     serviceHose: (hose) => {
@@ -1036,6 +774,7 @@ export const useSim = create<AppState>()((set, get) => {
       if (!sessionId || (!sim && !furnace)) return;
       const body: SubmitRequest = {
         diagnosisId,
+        equipmentJournal: s.equipmentJournal,
         repairs,
         safetyViolations: violations,
         measurementsTaken: measurements,

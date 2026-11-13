@@ -2,11 +2,13 @@
 
 ![HVAC-Sim: the condenser's control box open, with the tool bag on the left and the thermostat calling for cooling](docs/screenshot.png)
 
-Interactive 3D trainer for troubleshooting residential HVAC equipment. Two units so far:
+Interactive 3D trainer for troubleshooting residential HVAC equipment:
 
 - **A/C condenser** - split system, R-410A (`frontend/src/sim`, `backend/app/scenarios.py`)
 - **Gas furnace** - 80% single stage, hot-surface ignition, integrated control board
   (`frontend/src/sim/furnace`, `backend/app/furnace_scenarios.py`)
+- **Goodman GSZB4 + AMST** - single-stage heat pump with defrost and reversing-valve controls;
+  selectable alongside the generic equipment, with JSON configuration import/export.
 
 It also covers **EPA Section 608** preparation:
 
@@ -100,14 +102,98 @@ to the tutor. `/` lists available commands. `/l` toggles list mode: the exact fo
 hover label follows the cursor beside its tool icon. Commands also work while a
 tutor reply is pending, and remain available in prompt history.
 
-## Adding a scenario
+## Equipment architecture
+
+Keep definitions, running state, faults, actions, and assessment separate:
+
+| Boundary | Owns | Location |
+| --- | --- | --- |
+| Equipment context | Nominal specifications, appearance, controls; versioned JSON import/export | `backend/app/equipment/*.json` |
+| Component registry | Stable assembly, part and terminal IDs shared by scene adapters, tools, faults and procedures | `backend/app/equipment/registry/components.json` |
+| Runtime | Independent cloned state per session; electrical, thermal and control physics | `frontend/src/sim/engine.ts`, `furnace/engine.ts`, `heatPump.ts` |
+| Fault | Explicit physical changes applied to cloned nominal parameters; rating-relative changes where needed | `backend/app/faults.py`, `equipment/registry/faults.json` |
+| Action | Access checks, physical changes, safety results and typed evidence; store coordinates UI | `frontend/src/sim/equipment/actions.ts`, `furnaceActions.ts`, `types.ts` |
+| Procedure | Evidence milestones with prerequisites and invalidation rules; backend awards points | `equipment/registry/procedures.json`, `backend/app/procedures.py` |
+
+```mermaid
+flowchart LR
+  C[Equipment JSON] --> V[Validate and clone]
+  S[Scenario] --> F[Explicit fault IDs]
+  F --> V
+  V --> R[Session runtime]
+  R --> P[Physics engine]
+  P --> M[Scene and instruments]
+  M --> A[Typed user action]
+  A --> R
+  A --> E[Versioned event journal]
+  E --> G[Backend procedure grading]
+  G --> DB[(SQLite session_journals)]
+```
+
+Assemblies group parts; component kinds reuse behavior across models. For example,
+`system.outdoor.runCapacitor` identifies the same role on generic and Goodman equipment,
+while each context supplies its own ratings. Definitions hold no session state. Fault IDs,
+diagnoses and hints stay on the backend; the client receives physical parameters.
+
+**Implemented migration:** all existing component faults use explicit definitions; outdoor
+and furnace actions use pure handlers. `hum-no-start` records measurements and actions,
+shows procedure progress, and grades its 20 repair points from ordered evidence:
+
+```mermaid
+flowchart LR
+  I[Isolate power] --> V[Verify HERM-C below 3 V AC]
+  V --> D[Discharge]
+  D --> M[Measure capacitance]
+  M --> R[Replace safely]
+  R --> O[Restore power and verify operation]
+  P[Power restored before replacement] --> X[Repeat isolation and safety checks]
+  X --> I
+```
+
+Prerequisites enforce safety ordering while allowing unrelated checks and either lead order.
+Restoring power invalidates active isolation, voltage-check and discharge prerequisites.
+The backend checks final operating readings before awarding verification. Journals have schema
+version 1 and are validated and saved on submission. They are client evidence, not tamper-proof
+telemetry. Older clients without journals retain legacy grading.
+
+**Furnace:** all ten existing calls (including healthy orientation) have procedure graphs.
+Evidence covers flame current, voltage, resistance/open circuits, capacitance, clamp current,
+draft, gas pressure and supply-return temperature rise. Connected instruments record changed
+readings during the cycle, including brief ignition signals; unlit burners supply no flame-current
+diagnostic evidence. Cleaning or replacing the flame sensor are accepted alternatives.
+
+```mermaid
+flowchart LR
+  D[Collect live diagnostic readings] --> I[Service switch OFF]
+  I --> V[Verify LOAD to N below 3 V AC]
+  V --> S{Repair type}
+  S -->|Gas valve| G[Close gas supply]
+  S -->|Blower capacitor| C[Discharge and measure capacitance]
+  S -->|Other| R[Repair component]
+  G --> R
+  C --> R
+  R --> O[Restore gas as needed, doors and power]
+  O --> H[Verify normal heating]
+```
+
+Door removal alone does not count as power isolation. Restored power invalidates safety checks;
+reopened gas invalidates valve-replacement isolation. Every furnace procedure contributes 20
+points in place of the legacy repair score; orientation uses baseline readings without a repair.
+Other outdoor scenarios retain legacy grading until their procedure graphs are added.
+
+## Adding equipment or a scenario
 
 Equipment JSON contexts, the Goodman heat-pump model, and tutor reply feedback are
 described in [Equipment contexts and feedback](docs/equipment-contexts.md).
 
-Add a `Scenario` to `backend/app/scenarios.py`: override the `UnitParams` fields that describe
-the fault, and set the `diagnosis_id`, `required_repair`, explanation and hints. No frontend
-change is needed unless the fault needs a new physical parameter.
+1. Add a nominal context JSON; reuse component kinds and stable IDs. Add new physics only
+   when the equipment needs a new physical behavior.
+2. Define the fault's component ID and explicit parameter changes in `faults.json`.
+   Use `ratedFraction` for faults that scale with a model's rating.
+3. Add a `Scenario` with nominal parameters, `fault_ids`, diagnosis, accepted repairs and hints
+   in `backend/app/scenarios.py` or `furnace_scenarios.py`.
+4. For evidence-based assessment, add a procedure graph, set `procedure_id`, and emit its typed
+   events from actions/instruments. Test model isolation, safety, ordering and backend grading.
 
 ## Simplifications to know about
 

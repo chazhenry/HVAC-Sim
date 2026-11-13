@@ -1,0 +1,1021 @@
+{
+  "schemaVersion": 1,
+  "procedures": [
+    {
+      "id": "capacitor-start-diagnosis",
+      "title": "Compressor start-circuit checks",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Isolate outdoor power",
+          "eventType": "power.isolated",
+          "componentId": "system.outdoor.fuses",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify HERM–C is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.outdoor.runCapacitor",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 3,
+          "unit": "V",
+          "maxValue": 3,
+          "terminals": [
+            "CAP_C",
+            "CAP_HERM"
+          ]
+        },
+        {
+          "id": "discharge",
+          "label": "Discharge the capacitor",
+          "eventType": "capacitor.discharged",
+          "componentId": "system.outdoor.runCapacitor",
+          "requires": [
+            "verify-dead"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 3
+        },
+        {
+          "id": "measure",
+          "label": "Measure HERM–C capacitance",
+          "eventType": "measurement.capacitance",
+          "componentId": "system.outdoor.runCapacitor",
+          "requires": [
+            "discharge"
+          ],
+          "invalidatedBy": [],
+          "points": 4,
+          "unit": "µF",
+          "terminals": [
+            "CAP_C",
+            "CAP_HERM"
+          ]
+        },
+        {
+          "id": "replace",
+          "label": "Replace the capacitor safely",
+          "eventType": "component.replaced",
+          "componentId": "system.outdoor.runCapacitor",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "discharge",
+            "measure"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore power and verify operation",
+          "eventType": "operation.verified",
+          "componentId": "system.outdoor.compressor",
+          "requires": [
+            "replace"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ],
+      "verificationComponentId": "system.outdoor.compressor"
+    },
+    {
+      "id": "f-flame-sensor-diagnosis",
+      "title": "Flame-proving checks",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Turn the service switch OFF",
+          "eventType": "power.isolated",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify service-switch LOAD to N is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_SW_LOAD",
+            "F_SW_N"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "signal",
+          "label": "Measure flame current while the burners are lit",
+          "eventType": "measurement.current",
+          "componentId": "system.indoor.flameSensor",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 6,
+          "unit": "µA",
+          "terminals": [
+            "F_FS_ROD",
+            "F_BD_FS"
+          ],
+          "maxValue": 0.8
+        },
+        {
+          "id": "repair",
+          "label": "Complete the repair safely",
+          "eventType": "component.cleaned",
+          "componentId": "system.indoor.flameSensor",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "signal"
+          ],
+          "invalidatedBy": [],
+          "points": 6,
+          "eventTypes": [
+            "component.replaced"
+          ]
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore service and verify normal heat",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "repair"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ]
+    },
+    {
+      "id": "f-igniter-diagnosis",
+      "title": "Ignition checks",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Turn the service switch OFF",
+          "eventType": "power.isolated",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify service-switch LOAD to N is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_SW_LOAD",
+            "F_SW_N"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "supply",
+          "label": "Check igniter voltage during warm-up",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.igniter",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "V",
+          "terminals": [
+            "F_IGN_H",
+            "F_IGN_N"
+          ],
+          "minValue": 100
+        },
+        {
+          "id": "winding",
+          "label": "Check igniter resistance with power off",
+          "eventType": "measurement.resistance",
+          "componentId": "system.indoor.igniter",
+          "requires": [
+            "isolate",
+            "verify-dead"
+          ],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "Ω",
+          "terminals": [
+            "F_IGN_H",
+            "F_IGN_N"
+          ],
+          "status": "open"
+        },
+        {
+          "id": "repair",
+          "label": "Complete the repair safely",
+          "eventType": "component.replaced",
+          "componentId": "system.indoor.igniter",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "supply",
+            "winding"
+          ],
+          "invalidatedBy": [],
+          "points": 6
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore service and verify normal heat",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "repair"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ]
+    },
+    {
+      "id": "f-inducer-diagnosis",
+      "title": "Draft-motor checks",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Turn the service switch OFF",
+          "eventType": "power.isolated",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify service-switch LOAD to N is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_SW_LOAD",
+            "F_SW_N"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "supply",
+          "label": "Check inducer supply during a heat call",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.inducer",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "V",
+          "terminals": [
+            "F_IND_H",
+            "F_IND_N"
+          ],
+          "minValue": 100
+        },
+        {
+          "id": "winding",
+          "label": "Check inducer resistance with power off",
+          "eventType": "measurement.resistance",
+          "componentId": "system.indoor.inducer",
+          "requires": [
+            "isolate",
+            "verify-dead"
+          ],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "Ω",
+          "terminals": [
+            "F_IND_H",
+            "F_IND_N"
+          ],
+          "status": "open"
+        },
+        {
+          "id": "repair",
+          "label": "Complete the repair safely",
+          "eventType": "component.replaced",
+          "componentId": "system.indoor.inducer",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "supply",
+            "winding"
+          ],
+          "invalidatedBy": [],
+          "points": 6
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore service and verify normal heat",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "repair"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ]
+    },
+    {
+      "id": "f-pressure-switch-diagnosis",
+      "title": "Draft-proving checks",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Turn the service switch OFF",
+          "eventType": "power.isolated",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify service-switch LOAD to N is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_SW_LOAD",
+            "F_SW_N"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "draft",
+          "label": "Measure adequate inducer draft",
+          "eventType": "measurement.pressure",
+          "componentId": "system.indoor.pressureSwitch",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "inH2O",
+          "channel": "draft",
+          "maxValue": -0.65
+        },
+        {
+          "id": "switch",
+          "label": "Check voltage across the open pressure switch",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.pressureSwitch",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "V",
+          "terminals": [
+            "F_PS_A",
+            "F_PS_B"
+          ],
+          "minValue": 18
+        },
+        {
+          "id": "repair",
+          "label": "Complete the repair safely",
+          "eventType": "component.replaced",
+          "componentId": "system.indoor.pressureSwitch",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "draft",
+            "switch"
+          ],
+          "invalidatedBy": [],
+          "points": 6
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore service and verify normal heat",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "repair"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ]
+    },
+    {
+      "id": "f-gas-off-diagnosis",
+      "title": "Gas-supply checks",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Turn the service switch OFF",
+          "eventType": "power.isolated",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify service-switch LOAD to N is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_SW_LOAD",
+            "F_SW_N"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "inlet",
+          "label": "Check gas pressure at the valve inlet",
+          "eventType": "measurement.pressure",
+          "componentId": "system.indoor.gasValve",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "inH2O",
+          "channel": "inlet",
+          "maxValue": 0.5
+        },
+        {
+          "id": "call",
+          "label": "Check the gas-valve command during ignition",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.gasValve",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "V",
+          "terminals": [
+            "F_GV_MV",
+            "F_GV_C"
+          ],
+          "minValue": 18
+        },
+        {
+          "id": "repair",
+          "label": "Open the gas supply safely",
+          "eventType": "gas.opened",
+          "componentId": "system.indoor.gasSupply",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "inlet",
+            "call"
+          ],
+          "invalidatedBy": [],
+          "points": 6
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore service and verify normal heat",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "repair"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ]
+    },
+    {
+      "id": "f-gas-valve-diagnosis",
+      "title": "Gas-valve checks",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Turn the service switch OFF",
+          "eventType": "power.isolated",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify service-switch LOAD to N is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_SW_LOAD",
+            "F_SW_N"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "inlet",
+          "label": "Confirm gas pressure reaches the valve",
+          "eventType": "measurement.pressure",
+          "componentId": "system.indoor.gasValve",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 1,
+          "unit": "inH2O",
+          "channel": "inlet",
+          "minValue": 5
+        },
+        {
+          "id": "manifold",
+          "label": "Check manifold pressure during ignition",
+          "eventType": "measurement.pressure",
+          "componentId": "system.indoor.gasValve",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 1,
+          "unit": "inH2O",
+          "channel": "manifold",
+          "maxValue": 0.5
+        },
+        {
+          "id": "call",
+          "label": "Check voltage at the gas valve during ignition",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.gasValve",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_GV_MV",
+            "F_GV_C"
+          ],
+          "minValue": 18
+        },
+        {
+          "id": "coil",
+          "label": "Check valve-coil resistance with power off",
+          "eventType": "measurement.resistance",
+          "componentId": "system.indoor.gasValve",
+          "requires": [
+            "isolate",
+            "verify-dead"
+          ],
+          "invalidatedBy": [],
+          "points": 2,
+          "unit": "Ω",
+          "terminals": [
+            "F_GV_MV",
+            "F_GV_C"
+          ],
+          "status": "open"
+        },
+        {
+          "id": "gas-off",
+          "label": "Close the manual gas supply",
+          "eventType": "gas.closed",
+          "componentId": "system.indoor.gasSupply",
+          "requires": [],
+          "invalidatedBy": [
+            "gas.opened"
+          ],
+          "points": 0
+        },
+        {
+          "id": "repair",
+          "label": "Complete the repair safely",
+          "eventType": "component.replaced",
+          "componentId": "system.indoor.gasValve",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "inlet",
+            "manifold",
+            "call",
+            "coil",
+            "gas-off"
+          ],
+          "invalidatedBy": [],
+          "points": 6
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore service and verify normal heat",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "repair"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ]
+    },
+    {
+      "id": "f-filter-diagnosis",
+      "title": "Airflow checks",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Turn the service switch OFF",
+          "eventType": "power.isolated",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify service-switch LOAD to N is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_SW_LOAD",
+            "F_SW_N"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "rise",
+          "label": "Measure excessive supply-return temperature rise",
+          "eventType": "measurement.temperatureRise",
+          "componentId": "system.indoor.filter",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 4,
+          "unit": "°F",
+          "channel": "rise",
+          "minValue": 65
+        },
+        {
+          "id": "inspect",
+          "label": "Inspect the air filter",
+          "eventType": "component.inspected",
+          "componentId": "system.indoor.filter",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 2
+        },
+        {
+          "id": "repair",
+          "label": "Complete the repair safely",
+          "eventType": "component.replaced",
+          "componentId": "system.indoor.filter",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "rise",
+            "inspect"
+          ],
+          "invalidatedBy": [],
+          "points": 6
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore service and verify normal heat",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "repair"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ]
+    },
+    {
+      "id": "f-blower-cap-diagnosis",
+      "title": "Blower start-circuit checks",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Turn the service switch OFF",
+          "eventType": "power.isolated",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify service-switch LOAD to N is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_SW_LOAD",
+            "F_SW_N"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "supply",
+          "label": "Check blower supply when the board calls for airflow",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.blower",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_BLW_H",
+            "F_BLW_N"
+          ],
+          "minValue": 100
+        },
+        {
+          "id": "discharge",
+          "label": "Discharge the blower capacitor",
+          "eventType": "capacitor.discharged",
+          "componentId": "system.indoor.blowerCapacitor",
+          "requires": [
+            "isolate",
+            "verify-dead"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "capacitance",
+          "label": "Measure the blower capacitor",
+          "eventType": "measurement.capacitance",
+          "componentId": "system.indoor.blowerCapacitor",
+          "requires": [
+            "discharge"
+          ],
+          "invalidatedBy": [],
+          "points": 2,
+          "unit": "µF",
+          "terminals": [
+            "F_BCAP_A",
+            "F_BCAP_B"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "repair",
+          "label": "Complete the repair safely",
+          "eventType": "component.replaced",
+          "componentId": "system.indoor.blowerCapacitor",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "supply",
+            "discharge",
+            "capacitance"
+          ],
+          "invalidatedBy": [],
+          "points": 6
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore service and verify normal heat",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "repair"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ]
+    },
+    {
+      "id": "f-fuse-diagnosis",
+      "title": "Low-voltage supply checks",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "isolate",
+          "label": "Turn the service switch OFF",
+          "eventType": "power.isolated",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2
+        },
+        {
+          "id": "verify-dead",
+          "label": "Verify service-switch LOAD to N is below 3 V AC",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.serviceSwitch",
+          "requires": [
+            "isolate"
+          ],
+          "invalidatedBy": [
+            "power.restored"
+          ],
+          "points": 2,
+          "unit": "V",
+          "terminals": [
+            "F_SW_LOAD",
+            "F_SW_N"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "transformer",
+          "label": "Check transformer 24 V to common",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.lvFuse",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "V",
+          "terminals": [
+            "F_BD_SEC",
+            "F_BD_C"
+          ],
+          "minValue": 18
+        },
+        {
+          "id": "fused",
+          "label": "Check fused R to common",
+          "eventType": "measurement.voltage",
+          "componentId": "system.indoor.lvFuse",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 3,
+          "unit": "V",
+          "terminals": [
+            "F_BD_R",
+            "F_BD_C"
+          ],
+          "maxValue": 3
+        },
+        {
+          "id": "repair",
+          "label": "Complete the repair safely",
+          "eventType": "component.replaced",
+          "componentId": "system.indoor.lvFuse",
+          "requires": [
+            "isolate",
+            "verify-dead",
+            "transformer",
+            "fused"
+          ],
+          "invalidatedBy": [],
+          "points": 6
+        },
+        {
+          "id": "verify-operation",
+          "label": "Restore service and verify normal heat",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "repair"
+          ],
+          "invalidatedBy": [],
+          "points": 4
+        }
+      ]
+    },
+    {
+      "id": "f-orientation-diagnosis",
+      "title": "Heating-cycle baseline",
+      "verificationComponentId": "system.indoor.controlBoard",
+      "steps": [
+        {
+          "id": "signal",
+          "label": "Measure healthy flame current with burners lit",
+          "eventType": "measurement.current",
+          "componentId": "system.indoor.flameSensor",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 5,
+          "unit": "µA",
+          "terminals": [
+            "F_FS_ROD",
+            "F_BD_FS"
+          ],
+          "minValue": 0.8
+        },
+        {
+          "id": "manifold",
+          "label": "Measure normal manifold pressure",
+          "eventType": "measurement.pressure",
+          "componentId": "system.indoor.gasValve",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 5,
+          "unit": "inH2O",
+          "channel": "manifold",
+          "minValue": 3.2,
+          "maxValue": 3.8
+        },
+        {
+          "id": "rise",
+          "label": "Measure normal supply-return temperature rise",
+          "eventType": "measurement.temperatureRise",
+          "componentId": "system.indoor.filter",
+          "requires": [],
+          "invalidatedBy": [],
+          "points": 5,
+          "unit": "°F",
+          "channel": "rise",
+          "minValue": 35,
+          "maxValue": 65
+        },
+        {
+          "id": "verify-operation",
+          "label": "Verify normal heating operation",
+          "eventType": "operation.verified",
+          "componentId": "system.indoor.controlBoard",
+          "requires": [
+            "signal",
+            "manifold",
+            "rise"
+          ],
+          "invalidatedBy": [],
+          "points": 5
+        }
+      ]
+    }
+  ]
+}

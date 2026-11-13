@@ -1,4 +1,5 @@
 // Mirrors backend/app/models.py (camelCase aliases). Keep the two in sync.
+import type { EquipmentJournal } from '../sim/equipment/types';
 
 export interface ContactorParams {
   /** Coil DC resistance in ohms; null = open coil. */
@@ -134,6 +135,7 @@ interface SessionBase {
   scenario: ScenarioSummary;
   environment: Environment;
   context: EquipmentContext | null;
+  procedureId: string | null;
 }
 
 export type SessionResponse = SessionBase &
@@ -258,6 +260,7 @@ export interface ExamResult {
 }
 
 export interface SubmitRequest {
+  equipmentJournal?: EquipmentJournal;
   diagnosisId: string;
   repairs: RepairAction[];
   safetyViolations: string[];

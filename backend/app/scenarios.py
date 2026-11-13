@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
+from .faults import apply_faults
 from .models import (
-    CapacitorParams,
-    ContactorParams,
     DiagnosisOption,
     Difficulty,
     Environment,
-    FanMotorParams,
     FurnaceParams,
     RepairAction,
     ScenarioSummary,
@@ -37,6 +35,8 @@ class Scenario:
     # A planned refrigerant-circuit repair graded on EPA 608 service practice.
     procedure: bool = False
     environment: Environment = field(default_factory=Environment)
+    fault_ids: tuple[str, ...] = ()
+    procedure_id: str | None = None
 
     @property
     def unit_type(self) -> UnitType:
@@ -101,7 +101,9 @@ SCENARIOS: tuple[Scenario, ...] = (
             "Customer says the outdoor fan is spinning but the air from the vents is warm. They hear a "
             "loud hum from the unit every minute or so, then a click."
         ),
-        unit=UnitParams(capacitor=CapacitorParams(herm_uf=8.6)),
+        unit=UnitParams(),
+        fault_ids=('condenser.cap_herm',),
+        procedure_id="capacitor-start-diagnosis",
         diagnosis_id="cap_herm",
         required_repair=RepairAction.replace_capacitor,
         explanation=(
@@ -126,7 +128,8 @@ SCENARIOS: tuple[Scenario, ...] = (
             "Customer reports the outdoor unit starts, runs for a short while and shuts itself down. "
             "They noticed the big fan on top is not turning."
         ),
-        unit=UnitParams(capacitor=CapacitorParams(fan_uf=0.6)),
+        unit=UnitParams(),
+        fault_ids=('condenser.cap_fan',),
         diagnosis_id="cap_fan",
         required_repair=RepairAction.replace_capacitor,
         explanation=(
@@ -149,7 +152,8 @@ SCENARIOS: tuple[Scenario, ...] = (
             "Indoor blower runs and the thermostat is calling, but nothing at all happens outside. "
             "No hum, no fan."
         ),
-        unit=UnitParams(contactor=ContactorParams(coil_ohms=None)),
+        unit=UnitParams(),
+        fault_ids=('condenser.contactor_coil',),
         diagnosis_id="contactor_coil",
         required_repair=RepairAction.replace_contactor,
         explanation=(
@@ -171,7 +175,8 @@ SCENARIOS: tuple[Scenario, ...] = (
             "Customer hears a click from the outdoor unit when the thermostat calls, but the "
             "compressor and fan never start."
         ),
-        unit=UnitParams(contactor=ContactorParams(pole1_ohms=None)),
+        unit=UnitParams(),
+        fault_ids=('condenser.contactor_contacts',),
         diagnosis_id="contactor_contacts",
         required_repair=RepairAction.replace_contactor,
         explanation=(
@@ -194,7 +199,8 @@ SCENARIOS: tuple[Scenario, ...] = (
             "Unit keeps cutting out on a hot afternoon. A previous tech replaced the capacitor last "
             "week and the problem came back straight away."
         ),
-        unit=UnitParams(fan_motor=FanMotorParams(run_ohms=None)),
+        unit=UnitParams(),
+        fault_ids=('condenser.fan_motor',),
         diagnosis_id="fan_motor",
         required_repair=RepairAction.replace_fan_motor,
         explanation=(
@@ -217,7 +223,8 @@ SCENARIOS: tuple[Scenario, ...] = (
             "The system stopped cooling after a storm last night. Thermostat is calling, indoor blower "
             "runs, the outdoor unit clicks but does not start."
         ),
-        unit=UnitParams(fuse_l2_ok=False),
+        unit=UnitParams(),
+        fault_ids=('condenser.blown_fuse',),
         diagnosis_id="blown_fuse",
         required_repair=RepairAction.replace_fuses,
         explanation=(
@@ -241,7 +248,8 @@ SCENARIOS: tuple[Scenario, ...] = (
             "Unit runs non-stop and the house never gets below 78 F. Customer mentions ice on the "
             "copper line at the outdoor unit earlier this week."
         ),
-        unit=UnitParams(charge_fraction=0.72),
+        unit=UnitParams(),
+        fault_ids=('condenser.low_charge',),
         diagnosis_id="low_charge",
         required_repair=RepairAction.add_refrigerant,
         explanation=(
@@ -265,7 +273,8 @@ SCENARIOS: tuple[Scenario, ...] = (
             "Cooling is weak in the afternoon and the electric bill jumped. The unit sits next to a "
             "cottonwood tree and a dryer vent."
         ),
-        unit=UnitParams(coil_fouling=0.7),
+        unit=UnitParams(),
+        fault_ids=('condenser.dirty_coil',),
         diagnosis_id="dirty_coil",
         required_repair=RepairAction.clean_coil,
         explanation=(
@@ -339,4 +348,7 @@ SCENARIOS += (
 )
 
 DIAGNOSIS_BY_ID: dict[str, DiagnosisOption] = {d.id: d for d in DIAGNOSES}
+# Materialize generic instances once; equipment contexts use the same explicit faults.
+SCENARIOS = tuple(replace(s, unit=apply_faults(s.unit, s.fault_ids)) if s.unit is not None
+                  else replace(s, furnace=apply_faults(s.furnace, s.fault_ids)) for s in SCENARIOS)
 SCENARIO_BY_ID: dict[str, Scenario] = {s.id: s for s in SCENARIOS}

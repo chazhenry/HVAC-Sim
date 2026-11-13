@@ -11,6 +11,7 @@ import math
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from .equipment_registry import COMPONENTS
 from pydantic.alias_generators import to_camel
 
 
@@ -213,6 +214,7 @@ class SessionResponse(ApiModel):
     furnace: FurnaceParams | None = None
     environment: Environment
     context: EquipmentContext | None = None
+    procedure_id: str | None = None
 
 
 class HintResponse(ApiModel):
@@ -282,6 +284,60 @@ class ServiceReport(ApiModel):
     factory_charge_lb: float = 0.0
 
 
+class EquipmentEvent(ApiModel):
+    type: Literal["power.isolated", "power.restored", "measurement.voltage", "measurement.capacitance",
+                  "measurement.resistance", "measurement.current", "measurement.pressure", "measurement.temperatureRise",
+                  "capacitor.discharged", "component.replaced", "component.cleaned", "component.inspected",
+                  "gas.closed", "gas.opened", "door.opened", "door.closed", "interlock.bypassed", "interlock.released"]
+    component_id: str
+    t: float = Field(ge=0, allow_inf_nan=False)
+    safe: bool
+    value: float | None = Field(default=None, allow_inf_nan=False)
+    unit: Literal["V", "µF", "Ω", "µA", "A", "inH2O", "°F"] | None = None
+    status: Literal["open"] | None = None
+    channel: Literal["draft", "inlet", "manifold", "rise"] | None = None
+    terminals: list[str] = Field(default_factory=list, max_length=2)
+
+    @model_validator(mode="after")
+    def valid_component(self) -> EquipmentEvent:
+        if self.component_id not in COMPONENTS:
+            raise ValueError("Unknown component")
+        if self.type.startswith("measurement."):
+            units = {"voltage": ("V",), "capacitance": ("µF",), "resistance": ("Ω",),
+                     "current": ("µA", "A"), "pressure": ("inH2O",), "temperatureRise": ("°F",)}
+            kind = self.type.removeprefix("measurement.")
+            is_open = kind == "resistance" and self.status == "open" and self.value is None
+            if self.unit not in units[kind] or (self.value is None and not is_open):
+                raise ValueError("Measurement requires a value or open resistance, and correct unit")
+            if self.status is not None and not is_open:
+                raise ValueError("Only open resistance may omit a measured value")
+            if kind not in ("pressure", "temperatureRise") and self.value is not None and self.value < 0:
+                raise ValueError("Electrical readings cannot be negative")
+            if kind in ("voltage", "capacitance", "resistance") or self.unit == "µA":
+                component = COMPONENTS[self.component_id]
+                pair = set(self.terminals)
+                if len(pair) != 2 or not (pair.issubset(component["terminals"]) or any(pair == set(p) for p in component.get("measurementPairs", []))):
+                    raise ValueError("Measurement requires two terminals associated with this component")
+            if kind == "pressure" and (self.component_id, self.channel) not in {
+                ("system.indoor.pressureSwitch", "draft"), ("system.indoor.gasValve", "inlet"), ("system.indoor.gasValve", "manifold")
+            }:
+                raise ValueError("Unknown pressure tap")
+            if kind == "temperatureRise" and (self.component_id != "system.indoor.filter" or self.channel != "rise"):
+                raise ValueError("Unknown temperature measurement")
+        return self
+
+
+class EquipmentJournal(ApiModel):
+    schema_version: Literal[1] = 1
+    events: list[EquipmentEvent] = Field(default_factory=list, max_length=2000)
+
+    @model_validator(mode="after")
+    def ordered(self) -> EquipmentJournal:
+        if any(right.t < left.t for left, right in zip(self.events, self.events[1:])):
+            raise ValueError("Equipment events must be chronological")
+        return self
+
+
 class SubmitRequest(ApiModel):
     diagnosis_id: str
     repairs: list[RepairAction] = Field(default_factory=list)
@@ -291,6 +347,7 @@ class SubmitRequest(ApiModel):
     final_state: FinalState | None = None
     furnace_final: FurnaceFinalState | None = None
     service: ServiceReport | None = None
+    equipment_journal: EquipmentJournal | None = None
 
 
 class ScoreLine(ApiModel):

@@ -12,6 +12,7 @@ from .models import (
     SubmitRequest,
 )
 from .scenarios import DIAGNOSIS_BY_ID, Scenario
+from .procedures import procedure_score
 
 DIAGNOSIS_POINTS = 45
 REPAIR_POINTS = 20
@@ -156,6 +157,12 @@ def grade(scenario: Scenario, submission: SubmitRequest, hints_used: int) -> Gra
         panels = submission.final_state.panels_installed
     else:
         verified, verify_note, panels = False, "No final readings were submitted.", False
+    if scenario.procedure_id is not None and submission.equipment_journal is not None:
+        milestone_line = procedure_score(scenario.procedure_id, submission.equipment_journal, verified)
+        if unneeded:
+            milestone_line.points = max(0, milestone_line.points - UNNEEDED_PART_PENALTY * len(unneeded))
+            milestone_line.note += f" Unnecessary parts fitted: {', '.join(unneeded)}."
+        lines[-1] = milestone_line
     lines.append(
         ScoreLine(
             label="Verified operation",

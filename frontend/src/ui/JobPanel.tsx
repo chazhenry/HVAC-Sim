@@ -2,6 +2,7 @@ import { type ReactNode, useState } from 'react';
 import { useSim } from '../store/useSim';
 import { ChatPanel } from './ChatPanel';
 import { EquipmentStatus } from './EquipmentStatus';
+import { ProcedureProgress } from './ProcedureProgress';
 import { Instruments, useInstrumentNames } from './Instruments';
 
 /**
@@ -79,6 +80,7 @@ export function JobPanel(): ReactNode {
         </CollapsibleCard>
 
         <EquipmentStatus />
+        <ProcedureProgress />
 
         <CollapsibleCard id="instruments" title="Instruments" {...(instruments ? { detail: instruments } : {})}>
           <Instruments />

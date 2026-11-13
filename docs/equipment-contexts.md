@@ -58,14 +58,15 @@ The application remains a private demonstration, not HVAC guidance.
 
 Successful tutor replies have thumbs-up/down controls. Each opens a modal with the
 original prompt and answer in read-only fields and a required explanation. The
-signed-in guest's name is attached automatically, including when localStorage is
+signed-in account's email is attached automatically, including when localStorage is
 unavailable for this visit. Local slash-command responses and failed requests are
 not LLM replies and have no rating controls.
 
 `POST /api/feedback` accepts `replyId`, `rating` (`up` or `down`), `explanation`, and
 `user`. The backend obtains the prompt and answer from its `chat_replies` table;
 client-supplied replacements cannot alter the original exchange. SQLite `feedback`
-stores the guest name, rating, explanation, exchange, session/reply IDs and UTC time.
-Submitting again for the same guest/reply updates that feedback record. Feedback is
+stores the account email and user ID, rating, explanation, exchange, session/reply IDs and UTC time.
+The backend derives identity from the authenticated session and checks job ownership.
+Submitting again for the same account/reply updates that feedback record. Feedback is
 intentional and is saved for admin/localhost guests too; their automatic visit and
 activity analytics remain excluded. Feedback has no public read endpoint.

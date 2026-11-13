@@ -8,6 +8,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from .auth_store import AUTH_SCHEMA, AuthStoreMixin
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -72,19 +73,20 @@ class SessionRow:
     hints_used: int
     finished_at: str | None
     score: int | None
+    user_id: int | None = None
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class SessionStore:
+class SessionStore(AuthStoreMixin):
     def __init__(self, path: Path | str) -> None:
         self._lock = threading.Lock()
         self._db = sqlite3.connect(str(path), check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         with self._lock, self._db:
-            self._db.executescript(SCHEMA)
+            self._db.executescript(SCHEMA + AUTH_SCHEMA)
             # Upgrade existing installations without losing their recorded visits.
             self._db.execute("BEGIN IMMEDIATE")
             columns = {row["name"] for row in self._db.execute("PRAGMA table_info(visits)")}
@@ -92,6 +94,9 @@ class SessionStore:
                 self._db.execute("ALTER TABLE visits ADD COLUMN event TEXT NOT NULL DEFAULT 'home'")
             if "user" not in columns:
                 self._db.execute("ALTER TABLE visits ADD COLUMN user TEXT")
+            for table in ("sessions", "visits", "feedback"):
+                if "user_id" not in {row["name"] for row in self._db.execute(f"PRAGMA table_info({table})")}:
+                    self._db.execute(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER REFERENCES users(id)")
 
     def save_journal(self, session_id: str, journal_json: str) -> None:
         with self._lock, self._db:
@@ -113,28 +118,28 @@ class SessionStore:
                              (reply_id, session_id, prompt, answer, provider, _now()))
         return reply_id
 
-    def save_feedback(self, reply_id: str, user: str, rating: str, explanation: str) -> str | None:
+    def save_feedback(self, reply_id: str, user: str, rating: str, explanation: str, user_id: int | None = None) -> str | None:
         with self._lock, self._db:
             reply = self._db.execute("SELECT * FROM chat_replies WHERE id = ?", (reply_id,)).fetchone()
             if reply is None:
                 return None
             feedback_id = str(uuid.uuid4())
             self._db.execute(
-                "INSERT INTO feedback VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "INSERT INTO feedback (id, reply_id, session_id, user, rating, prompt, answer, explanation, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(reply_id, user) DO UPDATE SET rating=excluded.rating, "
-                "explanation=excluded.explanation, created_at=excluded.created_at",
+                "explanation=excluded.explanation, created_at=excluded.created_at, user_id=excluded.user_id",
                 (feedback_id, reply_id, reply["session_id"], user, rating, reply["prompt"],
-                 reply["answer"], explanation, _now()),
+                 reply["answer"], explanation, _now(), user_id),
             )
             return self._db.execute("SELECT id FROM feedback WHERE reply_id = ? AND user = ?",
                                     (reply_id, user)).fetchone()["id"]
 
-    def record_visit(self, visit_id: str, ip: str, app_version: str, event: str = "home", user: str | None = None) -> bool:
+    def record_visit(self, visit_id: str, ip: str, app_version: str, event: str = "home", user: str | None = None, user_id: int | None = None) -> bool:
         """Persist before geolocation; retrying a visit ID cannot count it twice."""
         with self._lock, self._db:
             cursor = self._db.execute(
-                "INSERT OR IGNORE INTO visits (id, visited_at, ip, app_version, event, user) VALUES (?, ?, ?, ?, ?, ?)",
-                (visit_id, _now(), ip, app_version, event, user),
+                "INSERT OR IGNORE INTO visits (id, visited_at, ip, app_version, event, user, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (visit_id, _now(), ip, app_version, event, user, user_id),
             )
         return cursor.rowcount == 1
 
@@ -170,12 +175,12 @@ class SessionStore:
                 (location["city"], location["state"], location["country"], visit_id),
             )
 
-    def create(self, scenario_id: str) -> SessionRow:
+    def create(self, scenario_id: str, user_id: int | None = None) -> SessionRow:
         session_id = uuid.uuid4().hex
         with self._lock, self._db:
             self._db.execute(
-                "INSERT INTO sessions (id, scenario_id, started_at) VALUES (?, ?, ?)",
-                (session_id, scenario_id, _now()),
+                "INSERT INTO sessions (id, scenario_id, started_at, user_id) VALUES (?, ?, ?, ?)",
+                (session_id, scenario_id, _now(), user_id),
             )
         row = self.get(session_id)
         assert row is not None
@@ -184,7 +189,7 @@ class SessionStore:
     def get(self, session_id: str) -> SessionRow | None:
         with self._lock:
             row = self._db.execute(
-                "SELECT id, scenario_id, started_at, hints_used, finished_at, score "
+                "SELECT id, scenario_id, started_at, hints_used, finished_at, score, user_id "
                 "FROM sessions WHERE id = ?",
                 (session_id,),
             ).fetchone()
@@ -211,11 +216,11 @@ class SessionStore:
                 (_now(), score, result_json, session_id),
             )
 
-    def history(self, limit: int = 50) -> list[SessionRow]:
+    def history(self, limit: int = 50, user_id: int | None = None) -> list[SessionRow]:
         with self._lock:
             rows = self._db.execute(
-                "SELECT id, scenario_id, started_at, hints_used, finished_at, score "
-                "FROM sessions WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT ?",
-                (limit,),
+                "SELECT id, scenario_id, started_at, hints_used, finished_at, score, user_id "
+                "FROM sessions WHERE finished_at IS NOT NULL " + ("AND user_id = ? " if user_id is not None else "") + "ORDER BY finished_at DESC LIMIT ?",
+                (user_id, limit) if user_id is not None else (limit,),
             ).fetchall()
         return [SessionRow(**dict(r)) for r in rows]

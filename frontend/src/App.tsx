@@ -14,7 +14,9 @@ import { Toolbox } from './ui/Toolbox';
 import { toolCursor } from './ui/toolIcons';
 import { WiringDiagram } from './ui/WiringDiagram';
 import { VisitsAdmin } from './ui/VisitsAdmin';
-import { GuestSignIn } from './ui/GuestSignIn';
+import { SignIn } from './ui/SignIn';
+import { AccountControls } from './ui/AccountControls';
+import { useAuth } from './store/useAuth';
 import { CursorPartLabel } from './ui/CursorPartLabel';
 import { APP_VERSION } from './version';
 
@@ -53,6 +55,7 @@ function TopBar({ onSubmit, onDiagram }: { onSubmit: () => void; onDiagram: () =
       <button type="button" className="primary" onClick={onSubmit}>
         Complete job
       </button>
+      <AccountControls compact />
     </header>
   );
 }
@@ -74,8 +77,9 @@ export function App(): ReactNode {
   const sessionId = useSim((s) => s.sessionId);
   const [submitting, setSubmitting] = useState(false);
   const [diagram, setDiagram] = useState(false);
-  const [guest, setGuest] = useState<string | null>(null);
-  const signedIn = useRef(false);
+  const user = useAuth((state) => state.user);
+  const token = useAuth((state) => state.token);
+  const signedIn = useRef<string | null>(null);
   const pane = usePaneWidth();
 
   // Frame the right piece of equipment whenever a new job starts.
@@ -87,8 +91,17 @@ export function App(): ReactNode {
   }, [sessionId]);
 
   useEffect(() => {
+    if (!user) {
+      useSim.getState().backToMenu();
+      signedIn.current = null;
+      return;
+    }
     void loadCatalog();
-  }, [loadCatalog]);
+    if (signedIn.current !== token) {
+      signedIn.current = token;
+      void api.trackVisit(crypto.randomUUID(), APP_VERSION, 'home', user.email).catch(() => undefined);
+    }
+  }, [loadCatalog, user, token]);
 
   useEffect(() => {
     const id = window.setInterval(() => tick(TICK_SECONDS), TICK_SECONDS * 1000);
@@ -100,17 +113,7 @@ export function App(): ReactNode {
   }, [phase]);
 
   const inJob = phase === 'running' || phase === 'graded';
-  if (guest === null) {
-    return <div className="app">
-      <GuestSignIn onSignIn={(name) => {
-        if (signedIn.current) return;
-        signedIn.current = true;
-        setGuest(name);
-        // Submit once after the guest confirms their name; React renders cannot double-count.
-        void api.trackVisit(crypto.randomUUID(), APP_VERSION, 'home', name).catch(() => undefined);
-      }} />
-    </div>;
-  }
+  if (user === null) return <div className="app"><SignIn /></div>;
   return (
     <div className="app">
       {inJob && <TopBar onSubmit={() => setSubmitting(true)} onDiagram={() => setDiagram((v) => !v)} />}

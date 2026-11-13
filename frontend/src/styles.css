@@ -676,6 +676,46 @@ h2 {
   width: min(860px, 100%);
 }
 
+.dialog.menu-dialog {
+  width: min(1400px, 100%);
+}
+
+.menu-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.menu-heading h1 { flex-shrink: 0; }
+.menu-heading .lede { flex: 1 1 480px; max-width: none; margin: 0; }
+
+.training-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.training-tabs button { flex: 1 1 220px; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; text-align: left; }
+.training-tabs button span, .training-domains button span { font-size: 12px; color: var(--muted); }
+.training-tabs [aria-selected='true'], .training-domains [aria-pressed='true'], .training-skill-filters [aria-pressed='true'] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.training-panel { display: flex; flex-direction: column; gap: 14px; }
+.training-panel a { color: var(--accent); }
+.training-domains { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.training-domains button { display: flex; flex-direction: column; align-items: stretch; gap: 7px; text-align: left; min-width: 0; }
+.training-domains progress { width: 100%; height: 6px; accent-color: var(--accent); }
+.training-skill-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.training-coverage { padding: 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
+.training-coverage-body { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.training-coverage summary, .training-progress-notes summary { cursor: pointer; }
+.training-progress-notes { font-size: 12px; color: var(--muted); }
+.training-progress-notes p { margin-top: 8px; }
+.training-result { margin-top: auto; font-size: 12px; color: var(--muted); }
+.training-result.complete { color: var(--good); }
+.training-scenario-skills { font-size: 11px; color: var(--accent); }
+.training-empty { padding: 14px; border: 1px dashed var(--line); border-radius: 8px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+@media (max-width: 900px) { .training-domains { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .training-domains { grid-template-columns: 1fr; } }
+
+.menu-dialog .scenarios {
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+}
+
 .dialog h1 {
   font-size: 26px;
 }
@@ -1621,6 +1661,7 @@ h2 {
 .guest-signin {
   margin: auto;
   color: var(--text);
+  max-height: calc(100dvh - 40px);
 }
 
 .guest-signin-form {
@@ -1628,6 +1669,17 @@ h2 {
   flex-direction: column;
   gap: 12px;
 }
+
+.guest-signin-form label { display: flex; flex-direction: column; gap: 5px; }
+.auth-name-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.auth-name-fields label { min-width: 0; }
+.password-rules { display: flex; flex-wrap: wrap; gap: 2px 12px; list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
+.password-rules li { padding: 2px 0; }
+.password-rules .met { color: var(--good); }
+.auth-show-password { align-self: flex-start; padding: 4px 0; font-size: 12px; }
+.auth-account { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 12px; }
+.auth-account.compact { flex-shrink: 0; }
+.auth-account.compact span { display: none; }
 
 .guest-signin-form input {
   width: 100%;

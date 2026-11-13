@@ -52,6 +52,26 @@ Open http://localhost:5173. The dev server proxies `/api` to port 8000.
 See [deploy/README.md](deploy/README.md): the backend goes to a Linux server as its own service,
 and the frontend is built into a folder of the website (e.g. `/hvac/`).
 
+## Accounts
+
+Create an account with email, first/last name, password and confirmation, then sign in with email
+and password. Passwords require 12–128 characters, uppercase/lowercase, a number and a symbol.
+SQLite `users` contains `id INTEGER PRIMARY KEY AUTOINCREMENT`, `email` (unique, case-insensitive),
+`fname`, `lname`, `ipaddress`, `login_count` and `pw_hash`. Salted scrypt hashes are stored;
+registration signs in and counts as the first login. Later sign-ins update IP and login count.
+
+`/api/auth/register` and `/api/auth/login` return a 12-hour opaque bearer session; `/api/auth/me`
+returns the current user and `/api/auth/logout` revokes that session. Tokens stay in browser memory
+and are stored as SHA-256 digests on the server. Only email is remembered in localStorage
+(`hvac-sim.email`) to prefill a new login after reload. Passwords and tokens are never saved there.
+All simulator APIs require sign-in except health and registration/login. Jobs/history are scoped
+to their account; visits and feedback use the account email and `user_id`, ignoring supplied identity.
+Admin/localhost analytics exclusions still apply. Existing records are retained by automatic migration.
+
+Use HTTPS in deployment and keep `HVAC_SIM_CORS_ORIGINS` set to the homepage origin; login/register
+check that origin. Optional `HVAC_SIM_ALLOWED_EMAILS` (comma-separated) restricts registration to
+invited addresses. Google login is deferred. Email verification and password reset are not included.
+
 ## Tests
 
 ```bash
@@ -103,6 +123,20 @@ hover label follows the cursor beside its tool icon. Commands also work while a
 tutor reply is pending, and remain available in prompt history.
 
 ## Equipment architecture
+
+The opening screen has **Residential troubleshooting**, **EPA 608 preparation**, and
+**NATE preparation** paths. EPA practice includes Core/Types I–III quizzes and the refrigerant
+service job; Types I and III have no matching simulated equipment. NATE practice maps selected
+CHP-5 objectives to existing calls, with source links and explicit coverage gaps. Mappings live in
+`backend/app/equipment/registry/training.json`; these are our interpretations, not NATE approval
+or a complete certification course. See the [NATE objectives](https://natex.org/technician/take-an-exam/kate)
+and [EPA test topics](https://www.epa.gov/section608/test-topics).
+
+Best job/quiz scores and completed practice counts are saved locally per account email in this
+browser, starting with newly graded work. Job completion requires ≥80, correct diagnosis, full
+repair/procedure and operation credit, and no safety deductions. Counts reflect mapped practice
+calls, not exam readiness; no certification is awarded. Blocked storage retains progress only
+for the current visit. The title and introduction share one responsive header row.
 
 Keep definitions, running state, faults, actions, and assessment separate:
 

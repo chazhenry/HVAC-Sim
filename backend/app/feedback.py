@@ -11,7 +11,7 @@ class FeedbackRequest(ApiModel):
     reply_id: UUID
     rating: Literal["up", "down"]
     explanation: str = Field(min_length=1, max_length=4000)
-    user: str = Field(min_length=1, max_length=100)
+    user: str = Field(min_length=1, max_length=254)
 
     @field_validator("explanation", "user", mode="before")
     @classmethod

@@ -1,6 +1,16 @@
 // Mirrors backend/app/models.py (camelCase aliases). Keep the two in sync.
 import type { EquipmentJournal } from '../sim/equipment/types';
 
+export interface AuthUser {
+  id: number;
+  email: string;
+  fname: string;
+  lname: string;
+  ipaddress: string;
+  loginCount: number;
+}
+export interface AuthResponse { user: AuthUser; token: string; expiresAt: number }
+
 export interface ContactorParams {
   /** Coil DC resistance in ohms; null = open coil. */
   coilOhms: number | null;

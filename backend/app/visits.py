@@ -39,7 +39,7 @@ class VisitRequest(ApiModel):
     visit_id: UUID
     app_version: str = Field(min_length=1, max_length=32)
     event: str = Field(default="home", min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$")
-    user: str | None = Field(default=None, min_length=1, max_length=100)
+    user: str | None = Field(default=None, min_length=1, max_length=254)
 
     @field_validator("user", mode="before")
     @classmethod

@@ -1,9 +1,13 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { rememberedGuestName } from '../store/guest';
+import { progressForUser, useTrainingProgress } from '../store/useTrainingProgress';
 import type { ExamPaper, ExamResult, ExamSection, ExamSectionInfo } from '../api/types';
 
 /** Menu block listing the EPA 608 practice sections. */
 export function ExamSections({ onPick }: { onPick: (section: ExamSection) => void }): ReactNode {
+  const user = rememberedGuestName();
+  const progress = useTrainingProgress((state) => progressForUser(state.profiles, user));
   const [sections, setSections] = useState<ExamSectionInfo[] | null>(null);
   useEffect(() => {
     let live = true;
@@ -26,13 +30,14 @@ export function ExamSections({ onPick }: { onPick: (section: ExamSection) => voi
               <span className="pill exam">{s.questionCount} questions</span>
               <strong>{s.title}</strong>
               <span className="complaint">{s.covers}</span>
+              {progress.exams[s.id] && <span className="training-result">Best practice score: {progress.exams[s.id]!.bestPercent}% · {progress.exams[s.id]!.passed ? 'Practice passed' : 'Keep practicing'}</span>}
             </button>
           </li>
         ))}
       </ul>
       <p className="fine">
-        Universal certification needs Core plus Types I, II and III. The real exam is 25 questions per
-        section, closed book, 70% to pass each. These are practice questions written for this trainer.
+        Universal preparation covers Core plus Types I, II and III. These are original practice
+        questions. Certification requires testing through an EPA-approved organization.
       </p>
     </section>
   );
@@ -57,10 +62,13 @@ export function Exam({ section, onClose }: { section: ExamSection; onClose: () =
   }, [section]);
 
   const grade = async (): Promise<void> => {
+    const user = rememberedGuestName();
     setBusy(true);
     setError(null);
     try {
-      setResult(await api.gradeExam(section, answers));
+      const graded = await api.gradeExam(section, answers);
+      useTrainingProgress.getState().recordExam(section, graded, user);
+      setResult(graded);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

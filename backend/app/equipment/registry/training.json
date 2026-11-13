@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "mappedOn": "2026-11-12",
+  "domains": [
+    {"id":"fundamentals","title":"HVAC Fundamentals","gap":"Practice covers tools and isolation. Science, construction and code study need additional resources."},
+    {"id":"electrical","title":"Electrical and Controls","gap":"Selected single-phase equipment only. Three-phase systems, field wiring installation and advanced electronics are not covered."},
+    {"id":"airflow","title":"Comfort and Airflow","gap":"Practice covers temperature rise and restrictions. Humidity, psychrometrics, static-pressure testing and air balancing are not covered."},
+    {"id":"installation","title":"Installation","gap":"Practice covers selected refrigerant service steps. Equipment installation, duct fabrication and commissioning are not comprehensively covered."},
+    {"id":"service","title":"Service","gap":"Selected residential faults only. This is not complete coverage of the service exam."}
+  ],
+  "sources": [
+    {"id":"nate-guide","label":"NATE CHP-5 overview · page 9","url":"https://natex.org/wp-content/uploads/2024/01/NATE-Guide-to-Success-2024.pdf"},
+    {"id":"nate-electrical","label":"Electrical KATE · pages 9–12","url":"https://natex.org/wp-content/uploads/2022/06/CHP-5-Electrical-and-Controls-KATE.pdf"},
+    {"id":"nate-airflow","label":"Comfort and Airflow KATE · pages 8, 11","url":"https://natex.org/wp-content/uploads/2022/06/CHP-5-Comfort-and-Airflow-KATE.pdf"},
+    {"id":"nate-installation","label":"Installation KATE · page 9","url":"https://natex.org/wp-content/uploads/2022/06/CHP-5-Installation-KATE.pdf"},
+    {"id":"nate-service","label":"NATE service objectives","url":"https://natex.org/technician/take-an-exam/kate"},
+    {"id":"epa-topics","label":"EPA 608 test topics","url":"https://www.epa.gov/section608/test-topics"}
+  ],
+  "skills": [
+    {"id":"safe-tools","domain":"fundamentals","label":"Tools and safe isolation","objective":"Select instruments, isolate equipment and verify conditions before repair.","sourceIds":["nate-guide"],"scenarioIds":["orientation","hum-no-start","c-608-drier","f-orientation","f-flame-sensor","f-igniter","f-inducer","f-pressure-switch","f-gas-off","f-gas-valve","f-filter","f-blower-cap","f-fuse"]},
+    {"id":"electrical-tests","domain":"electrical","label":"Meters and component tests","objective":"Use voltage, current, resistance and capacitance readings to distinguish failed loads from supply faults.","sourceIds":["nate-electrical"],"scenarioIds":["orientation","hum-no-start","fan-not-spinning","dead-unit-coil","dead-unit-contacts","fan-motor","blown-fuse","f-orientation","f-flame-sensor","f-igniter","f-inducer","f-gas-valve","f-blower-cap","f-fuse"]},
+    {"id":"control-sequences","domain":"electrical","label":"Control circuits and sequences","objective":"Trace a call through low-voltage controls, safety switches and equipment outputs.","sourceIds":["nate-electrical"],"scenarioIds":["orientation","dead-unit-coil","blown-fuse","hp-heating","hp-defrost","f-orientation","f-pressure-switch","f-igniter","f-inducer","f-flame-sensor","f-fuse"]},
+    {"id":"airflow-rise","domain":"airflow","label":"Temperature rise and restrictions","objective":"Compare supply and return temperatures and distinguish restricted airflow from a blower start fault.","sourceIds":["nate-airflow"],"scenarioIds":["f-orientation","f-filter","f-blower-cap"]},
+    {"id":"refrigerant-work","domain":"installation","label":"Evacuation and charging","objective":"Practice recovery, regulated nitrogen testing, evacuation with a standing test and charging by weight.","sourceIds":["nate-installation","epa-topics"],"scenarioIds":["c-608-drier"]},
+    {"id":"fault-diagnosis","domain":"service","label":"Residential fault diagnosis","objective":"Use measured evidence to choose a repair and verify restored heating or cooling.","sourceIds":["nate-guide","nate-service"],"scenarioIds":["hum-no-start","fan-not-spinning","dead-unit-coil","dead-unit-contacts","fan-motor","blown-fuse","low-charge","dirty-coil","f-flame-sensor","f-igniter","f-inducer","f-pressure-switch","f-gas-off","f-gas-valve","f-filter","f-blower-cap","f-fuse"]}
+  ],
+  "epaPracticalScenarioIds": ["c-608-drier"]
+}

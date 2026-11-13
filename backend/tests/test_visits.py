@@ -47,7 +47,7 @@ def test_visits_persist_geolocation_and_deduplicate(tmp_path: Path, monkeypatch:
     assert calls[0] == "https://ipwho.is/8.8.8.8"
     assert dict(result[0]) == {
         "id": body["visitId"], "visited_at": result[0]["visited_at"], "ip": "8.8.8.8",
-        "city": "New York", "state": "New York", "country": "United States", "app_version": "26.11.11", "event": "home", "user": None,
+        "city": "New York", "state": "New York", "country": "United States", "app_version": "26.11.11", "event": "home", "user": None, "user_id": None,
     }
     assert result[0]["visited_at"].endswith("+00:00")
     # Opening the existing database preserves visits and the sessions schema.
@@ -264,7 +264,7 @@ def test_guest_name_is_saved_trimmed_and_searchable(tmp_path: Path) -> None:
     page = admin.get("/api/visits?search=jamie").json()
     assert page["total"] == 1
     assert page["items"][0]["user"] == "Jamie Guest"
-    for user in ["", "   ", "x" * 101]:
+    for user in ["", "   ", "x" * 255]:
         assert visitor.post("/api/visits", json={**payload(), "user": user}).status_code == 422
     assert len(rows(path)) == 1
 

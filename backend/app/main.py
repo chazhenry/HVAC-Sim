@@ -12,6 +12,9 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.responses import JSONResponse
 
 from .exam import (
     SECTION_META,
@@ -24,7 +27,7 @@ from .exam import (
     paper,
     section_info,
 )
-from . import llm
+from . import llm, auth
 from .grading import grade
 from .feedback import FeedbackRequest
 from .contexts import CONTEXTS, apply_context
@@ -67,6 +70,27 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     limiter = UsageLimiter()
     store = SessionStore(db_path or os.environ.get("HVAC_SIM_DB", DEFAULT_DB))
 
+    @app.middleware("http")
+    async def authentication(request: Request, call_next):
+        if request.url.path.startswith("/api/") and request.method != "OPTIONS" and request.url.path not in auth.PUBLIC_PATHS:
+            try:
+                auth.authorize(request, store)
+            except HTTPException as error:
+                return JSONResponse({"detail": error.detail}, status_code=error.status_code,
+                                    headers={**(error.headers or {}), "Cache-Control": "no-store"})
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, error: RequestValidationError):
+        if request.url.path.startswith("/api/auth/"):
+            # Never echo password-bearing request inputs in validation responses.
+            messages = [item["msg"].removeprefix("Value error, ") for item in error.errors()]
+            return JSONResponse({"detail": " ".join(dict.fromkeys(messages))}, status_code=422)
+        return await request_validation_exception_handler(request, error)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins(),
@@ -74,9 +98,12 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    def load(session_id: str) -> tuple[SessionRow, Scenario]:
+    app.include_router(auth.auth_router(store, allowed_origins()))
+
+    def load(session_id: str, request: Request) -> tuple[SessionRow, Scenario]:
         row = store.get(session_id)
-        if row is None:
+        user = getattr(request.state, "auth_user", None)
+        if row is None or user is not None and row.user_id != user["id"]:
             raise HTTPException(status_code=404, detail="Unknown session")
         scenario = SCENARIO_BY_ID[row.scenario_id]
         if (config := store.get_context(session_id)) is not None:
@@ -95,7 +122,8 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         if ip in VISITS_ADMIN_IPS:
             return {"status": "excluded"}
         visit_id = str(body.visit_id)
-        if store.record_visit(visit_id, ip, body.app_version, body.event, body.user):
+        user = getattr(request.state, "auth_user", None)
+        if store.record_visit(visit_id, ip, body.app_version, body.event, user["email"] if user else body.user, user["id"] if user else None):
             tasks.add_task(locate_visit, store, visit_id, ip)
         return {"status": "accepted"}
 
@@ -132,7 +160,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         return body
 
     @app.post("/api/sessions", response_model=SessionResponse)
-    def start_session(body: StartSessionRequest) -> SessionResponse:
+    def start_session(body: StartSessionRequest, request: Request) -> SessionResponse:
         scenario = SCENARIO_BY_ID.get(body.scenario_id)
         if scenario is None:
             raise HTTPException(status_code=404, detail="Unknown scenario")
@@ -143,7 +171,8 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
                 raise HTTPException(status_code=422, detail=str(error)) from error
         elif scenario.id.startswith("hp-"):
             raise HTTPException(status_code=422, detail="Choose a heat pump equipment context")
-        row = store.create(scenario.id)
+        user = getattr(request.state, "auth_user", None)
+        row = store.create(scenario.id, user["id"] if user else None)
         if body.context is not None:
             store.set_context(row.id, body.context.model_dump_json(by_alias=True))
         return SessionResponse(
@@ -158,16 +187,16 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         )
 
     @app.post("/api/sessions/{session_id}/hint", response_model=HintResponse)
-    def next_hint(session_id: str) -> HintResponse:
-        _, scenario = load(session_id)
+    def next_hint(session_id: str, request: Request) -> HintResponse:
+        _, scenario = load(session_id, request)
         used = store.use_hint(session_id, len(scenario.hints))
         return HintResponse(
             hint=scenario.hints[used - 1], hints_used=used, hints_total=len(scenario.hints)
         )
 
     @app.post("/api/sessions/{session_id}/submit", response_model=GradeResponse)
-    def submit(session_id: str, body: SubmitRequest) -> GradeResponse:
-        row, scenario = load(session_id)
+    def submit(session_id: str, body: SubmitRequest, request: Request) -> GradeResponse:
+        row, scenario = load(session_id, request)
         if row.finished_at is not None:
             raise HTTPException(status_code=409, detail="Session already graded")
         if body.diagnosis_id not in DIAGNOSIS_BY_ID:
@@ -182,8 +211,8 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         return result
 
     @app.post("/api/sessions/{session_id}/chat", response_model=ChatResponse)
-    async def chat(session_id: str, body: ChatRequest) -> ChatResponse:
-        _, scenario = load(session_id)
+    async def chat(session_id: str, body: ChatRequest, request: Request) -> ChatResponse:
+        _, scenario = load(session_id, request)
         if (refusal := limiter.check(session_id)) is not None:
             raise HTTPException(status_code=429, detail=refusal)
         try:
@@ -198,8 +227,14 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         return ChatResponse(reply=reply, provider=provider, reply_id=reply_id)
 
     @app.post("/api/feedback", status_code=201)
-    def submit_feedback(body: FeedbackRequest) -> dict[str, str]:
-        feedback_id = store.save_feedback(str(body.reply_id), body.user, body.rating, body.explanation)
+    def submit_feedback(body: FeedbackRequest, request: Request) -> dict[str, str]:
+        user = getattr(request.state, "auth_user", None)
+        if user is not None:
+            session_id = store.reply_session(str(body.reply_id))
+            if session_id is None:
+                raise HTTPException(status_code=404, detail="Unknown tutor reply")
+            load(session_id, request)
+        feedback_id = store.save_feedback(str(body.reply_id), user["email"] if user else body.user, body.rating, body.explanation, user["id"] if user else None)
         if feedback_id is None:
             raise HTTPException(status_code=404, detail="Unknown tutor reply")
         return {"id": feedback_id}
@@ -217,7 +252,8 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         return grade_exam(section, body.answers)
 
     @app.get("/api/history", response_model=list[HistoryEntry])
-    def history() -> list[HistoryEntry]:
+    def history(request: Request) -> list[HistoryEntry]:
+        user = getattr(request.state, "auth_user", None)
         return [
             HistoryEntry(
                 session_id=r.id,
@@ -226,7 +262,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
                 finished_at=r.finished_at or "",
                 score=r.score or 0,
             )
-            for r in store.history()
+            for r in store.history(user_id=user["id"] if user else None)
             if r.scenario_id in SCENARIO_BY_ID
         ]
 

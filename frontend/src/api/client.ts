@@ -1,4 +1,6 @@
 import type {
+  AuthResponse,
+  AuthUser,
   CatalogResponse,
   EquipmentContext,
   ChatRequest,
@@ -13,6 +15,7 @@ import type {
   SubmitRequest,
   VisitsPage,
 } from './types';
+import { useAuth } from '../store/useAuth';
 
 export class ApiError extends Error {
   constructor(
@@ -32,15 +35,17 @@ const API_BASE = (import.meta.env.VITE_API_BASE ?? '/api').replace(/\/+$/, '');
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
+  const token = useAuth.getState().token;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers },
     });
   } catch {
     throw new ApiError('Cannot reach the HVAC-Sim API. Is the backend running?', 0);
   }
   if (!res.ok) {
+    if (res.status === 401 && token && useAuth.getState().token === token && path !== '/auth/login' && path !== '/auth/register') useAuth.getState().clearSession();
     let detail = res.statusText;
     try {
       const body = (await res.json()) as { detail?: unknown };
@@ -50,7 +55,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(detail || `Request failed (${res.status})`, res.status);
   }
-  return (await res.json()) as T;
+  return res.status === 204 ? undefined as T : await res.json() as T;
 }
 
 const post = (body?: unknown): RequestInit => ({
@@ -59,6 +64,11 @@ const post = (body?: unknown): RequestInit => ({
 });
 
 export const api = {
+  register: (email: string, fname: string, lname: string, password: string, confirmPassword: string) =>
+    request<AuthResponse>('/auth/register', post({ email, fname, lname, password, confirmPassword })),
+  login: (email: string, password: string) => request<AuthResponse>('/auth/login', post({ email, password })),
+  currentUser: () => request<AuthUser>('/auth/me'),
+  logout: () => request<void>('/auth/logout', post()),
   validateContext: (context: unknown) => request<EquipmentContext>('/contexts/validate', post(context)),
   feedback: (replyId: string, rating: 'up' | 'down', explanation: string, user: string) =>
     request<{ id: string }>('/feedback', post({ replyId, rating, explanation, user })),

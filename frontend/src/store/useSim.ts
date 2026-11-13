@@ -1,6 +1,8 @@
 import { applyFurnaceAction } from '../sim/equipment/furnaceActions';
 import { furnaceMeasurements } from '../sim/equipment/furnaceMeasurements';
 import { create } from 'zustand';
+import { useTrainingProgress } from './useTrainingProgress';
+import { rememberedGuestName } from './guest';
 import { applyEquipmentAction } from '../sim/equipment/actions';
 import { componentForTarget, componentForTerminal } from '../sim/equipment/registry';
 import type { EquipmentAction, EquipmentEvent, EquipmentJournal } from '../sim/equipment/types';
@@ -770,6 +772,7 @@ export const useSim = create<AppState>()((set, get) => {
 
     submit: async (diagnosisId) => {
       const s = get();
+      const user = rememberedGuestName();
       const { sim, furnace, sessionId, panels, fdoors, repairs, violations, measurements } = s;
       if (!sessionId || (!sim && !furnace)) return;
       const body: SubmitRequest = {
@@ -822,6 +825,7 @@ export const useSim = create<AppState>()((set, get) => {
       set({ busy: true, error: null });
       try {
         const result = await api.submit(sessionId, body);
+        if (s.scenario) useTrainingProgress.getState().recordJob(s.scenario.id, sessionId, result, user);
         set({ busy: false, result, phase: 'graded' });
       } catch (e) {
         set({ busy: false, error: e instanceof Error ? e.message : String(e) });

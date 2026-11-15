@@ -197,48 +197,34 @@ h2 {
 .tool-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 4px;
 }
 
+/* Tool tile: a large icon centred above the tool's full name; the group colour runs along the top edge. */
 .tool {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
-  padding: 7px;
-  text-align: left;
-  min-height: 66px;
-}
-
-.tool-head {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px 4px 5px;
+  text-align: center;
+  min-height: 70px;
+  border-top: 3px solid var(--tone, var(--line));
 }
 
 .tool-icon {
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   background: center / contain no-repeat;
   flex: none;
 }
 
-.tool .badge {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 22px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 800;
-  color: #10141a;
-  background: var(--tone, #aab4bf);
-}
-
 .tool-name {
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .tone-steel {

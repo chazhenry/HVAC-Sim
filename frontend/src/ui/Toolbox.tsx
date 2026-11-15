@@ -9,10 +9,7 @@ function ToolTile({ item, active, onPick }: { item: PlacedTool; active: boolean;
   return (
     <button type="button" className={`tool tone-${item.tone}${active ? ' active' : ''}`}
       aria-pressed={active} onClick={onPick}>
-      <span className="tool-head">
-        <span className="badge">{item.badge}</span>
-        <span className="tool-icon" aria-hidden="true" style={{ backgroundImage: toolIconUrl(item.id, item.color) }} />
-      </span>
+      <span className="tool-icon" aria-hidden="true" style={{ backgroundImage: toolIconUrl(item.id, item.color) }} />
       <span className="tool-name">{item.name}</span>
     </button>
   );

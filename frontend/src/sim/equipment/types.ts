@@ -4,6 +4,7 @@ import type { FurnaceState } from '../furnace/engine';
 
 export type ToolId =
   | 'hand'
+  | 'speak'
   | 'nutdriver'
   | 'multimeter'
   | 'clamp'

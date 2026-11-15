@@ -82,6 +82,17 @@ export function ScenarioCards({
   );
 }
 
+type JobStage = "all" | "intro" | "easy" | "medium" | "hard";
+
+/** Stage filter for the Job cards, one pill per difficulty plus "All". */
+const JOB_STAGES: ReadonlyArray<{ id: JobStage; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "intro", label: "Intro" },
+  { id: "easy", label: "Easy" },
+  { id: "medium", label: "Medium" },
+  { id: "hard", label: "Hard" },
+];
+
 export function TrainingMenu({
   catalog,
   context,
@@ -103,6 +114,7 @@ export function TrainingMenu({
 }): ReactNode {
   const [domain, setDomain] = useState("electrical");
   const [skillId, setSkillId] = useState<string | null>(null);
+  const [stage, setStage] = useState<JobStage>("easy");
   const user = rememberedGuestName();
   const progress = useTrainingProgress((state) =>
     progressForUser(state.profiles, user),
@@ -115,6 +127,7 @@ export function TrainingMenu({
     (scenario) => !mapped || mapped.has(scenario.id),
   );
   const visible = compatibleScenarios(relevant, context);
+  const staged = stage === "all" ? visible : visible.filter((scenario) => scenario.difficulty === stage);
   const alternative = catalog.contexts.find(
     (item) => compatibleScenarios(relevant, item).length > 0,
   );
@@ -131,7 +144,7 @@ export function TrainingMenu({
         className="menu-card training-mode"
         aria-labelledby="training-mode-title"
       >
-        <h2 id="training-mode-title">Training Mode</h2>
+        <h2 id="training-mode-title">1. Training Mode</h2>
         <div
           className="training-tabs"
           role="tablist"
@@ -307,11 +320,27 @@ export function TrainingMenu({
             onSelect={onContext}
           />
         )}
-        <section className="unit-group" aria-label="Available service calls">
+        <section className="menu-card unit-group" aria-labelledby="job-title">
+          <div className="job-heading">
+            <h2 id="job-title">3. Job</h2>
+            <div className="job-stages" role="group" aria-label="Show jobs by stage">
+              {JOB_STAGES.map((item) => (
+                <button key={item.id} type="button" className={`pill stage-pill ${item.id}`}
+                  aria-pressed={stage === item.id} onClick={() => setStage(item.id)}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <h3>{context?.name ?? "Service calls"}</h3>
-          {visible.length > 0 ? (
+          {visible.length > 0 && staged.length === 0 ? (
+            <div className="training-empty">
+              <p>No {stage} jobs for this equipment and training mode.</p>
+              <button type="button" onClick={() => setStage("all")}>Show all jobs</button>
+            </div>
+          ) : visible.length > 0 ? (
             <ScenarioCards
-              scenarios={visible}
+              scenarios={staged}
               busy={busy}
               progress={progress}
               showSkills={track === "nate"}

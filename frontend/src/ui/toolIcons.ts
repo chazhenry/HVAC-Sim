@@ -12,6 +12,7 @@ const THERMOMETER =
   '<path d="M12 3a2 2 0 0 0-2 2v9.2a4 4 0 1 0 4 0V5a2 2 0 0 0-2-2z"/><circle cx="12" cy="17.5" r="1.6" fill="FILL"/><path d="M12 16V8"/>';
 
 const ICONS: Record<ToolId, string> = {
+  speak: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/>',
   hand: '<path d="M9 12V5.5a1.5 1.5 0 0 1 3 0V11l5 1a2 2 0 0 1 1.6 2v2.5a5 5 0 0 1-5 5h-1.8a5 5 0 0 1-4.3-2.5L5 14.6a1.4 1.4 0 0 1 2.2-1.7L9 14.6"/>',
   nutdriver:
     '<path d="M3.5 20.5l4-4" stroke-width="4.5"/><path d="M8 16l8-8"/><path d="M15 6.5l2.5-2 3 3-2 2.5z"/>',

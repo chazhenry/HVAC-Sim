@@ -49,6 +49,7 @@ const CONDENSER_GROUPS: readonly ToolGroup[] = [
     tone: 'steel',
     tools: [
       { id: 'hand', name: 'Hand', badge: 'HA', how: 'Click the disconnect cover to open it, and the pull-out to kill or restore power.' },
+      { id: 'speak', name: 'Speak', badge: 'SP', how: 'Click any part to hear its name read aloud. Nothing on the unit is changed.' },
       { id: 'nutdriver', name: 'Nut driver', badge: 'ND', how: 'Click a panel to remove it (access panel, front louver panel) or to swing the fan top up. Click it again to refit.' },
     ],
   },
@@ -82,6 +83,7 @@ const FURNACE_GROUPS: readonly ToolGroup[] = [
     tone: 'steel',
     tools: [
       { id: 'hand', name: 'Hand', badge: 'HA', how: 'Lift the doors off, flip the service switch, turn the gas shut-off, and tape down the door switch to run with the blower door off.' },
+      { id: 'speak', name: 'Speak', badge: 'SP', how: 'Click any part to hear its name read aloud. Nothing on the unit is changed.' },
     ],
   },
   { title: 'Electrical', tone: 'amber', tools: [MULTIMETER, CLAMP, NCV, DISCHARGE] },

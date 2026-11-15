@@ -10,7 +10,8 @@ import { TEST_POINT_PLACEMENT, type TestPointPlacement, type Vec3, type WireDef 
 import { CLAMP_NOTES, clampReason } from './clampNotes';
 import { toolName } from '../ui/toolNames';
 import { beginClick, endClick } from '../store/clickScope';
-import { playCue } from '../store/useAudio';
+import { playCue, useAudio } from '../store/useAudio';
+import { speakName } from '../audio/speech';
 
 const placementOf = (id: AnyTestPointId): TestPointPlacement =>
   isFurnacePoint(id) ? F_TEST_POINT_PLACEMENT[id] : TEST_POINT_PLACEMENT[id];
@@ -36,6 +37,11 @@ export function interactive(label: string, onActivate: () => void): PointerHandl
       e.stopPropagation();
       // Ignore the click that ends an orbit drag, or a press-and-hold that only identified the part.
       if (e.delta > 6 || identifyBlocksClick()) return;
+      // The Speak tool reads the part's name aloud and leaves the unit untouched.
+      if (useSim.getState().tool === 'speak') {
+        if (!speakName(label, useAudio.getState().volume)) useSim.getState().explainNoEffect(label, 'Speak tool (no speech in this browser)');
+        return;
+      }
       // Messages from this click are toasted at once, centred on the click point (see JobLogToasts).
       const scope = beginClick(e.nativeEvent.clientX, e.nativeEvent.clientY);
       try {
@@ -292,6 +298,7 @@ function ClampGlints(): ReactNode {
 /** A control-box wire. With the clamp meter selected it can be clamped. */
 export function Wire({ wire }: { wire: WireDef }): ReactNode {
   const clampTool = useSim((s) => s.tool === 'clamp');
+  const speakTool = useSim((s) => s.tool === 'speak');
   const clamped = useSim((s) => wire.clamp !== undefined && s.clampAt === wire.clamp);
   const { clamp } = wire;
   // A wire with nothing useful for the clamp explains why when the clamp meter is used on it.
@@ -301,7 +308,9 @@ export function Wire({ wire }: { wire: WireDef }): ReactNode {
       ? interactive(`Wire: ${clampLabel(clamp)}`, () => useSim.getState().clampWire(clamp))
       : note && clampTool
         ? interactive(`Wire: ${note.name}`, () => useSim.getState().rejectClamp(note.name, note.why))
-        : undefined;
+        : note && speakTool
+          ? interactive(`Wire: ${note.name}`, () => undefined)
+          : undefined;
   const mid = wire.points[Math.floor(wire.points.length / 2)] ?? [0, 0, 0];
   return (
     <group>

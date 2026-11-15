@@ -678,8 +678,10 @@ h2 {
   width: min(860px, 100%);
 }
 
+/* The intro page uses 90% of the window's width. */
 .dialog.menu-dialog {
-  width: min(1400px, 100%);
+  width: 90vw;
+  max-width: 100%;
 }
 
 .menu-heading {
@@ -2281,3 +2283,51 @@ kbd { font: 11px/1.4 Consolas, monospace; padding: 0 4px; color: var(--muted); b
 
 /* With a meter in hand its drawing is the pointer over the whole 3D view, buttons included. */
 .viewport.meter-pointer, .viewport.meter-pointer * { cursor: none !important; }
+
+/* Intro page: a green check in the top-right corner of each selected choice (training mode, equipment). */
+.training-tabs button, .equipment-options button { position: relative; }
+.training-tabs [aria-selected='true']::after,
+.equipment-options button[aria-pressed='true']::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--good);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+/* Keep titles clear of the check. */
+.training-tabs button, .equipment-options button { padding-right: 36px; }
+
+/* "3. Job" heading with its stage pills (All / Intro / Medium / Hard). */
+.job-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.job-stages { display: flex; gap: 6px; flex-wrap: wrap; }
+.stage-pill { border: 1px solid transparent; cursor: pointer; padding: 4px 12px; opacity: 0.55; }
+.stage-pill.all { background: #b6c0cb; }
+.stage-pill.intro { background: #8fb8e8; }
+.stage-pill:hover:not(:disabled) { opacity: 0.85; border-color: transparent; }
+.stage-pill[aria-pressed='true'] { opacity: 1; border-color: #fff; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
+
+/* "2. Equipment": heading with the configuration gear in the card's top-right corner. */
+.equipment-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.equipment-gear { color: var(--muted); }
+.equipment-menu { min-width: 240px; }
+/* Edit context modal. */
+.context-editor { margin: auto; color: var(--text); width: min(760px, calc(100vw - 32px)); }
+.context-editor::backdrop { background: rgba(8, 11, 15, 0.72); }
+.context-editor .equipment-json { min-height: 380px; margin: 0; }
+.context-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* The equipment gear sits in the intro dialog's top-right corner. */
+.dialog.menu-dialog { position: relative; }
+.equipment-gear-anchor { position: absolute; top: 14px; right: 14px; z-index: 2; }
+.menu-heading { padding-right: 44px; }
+.equipment-menu > button svg { flex: none; color: var(--muted); }

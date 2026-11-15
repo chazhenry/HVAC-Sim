@@ -3,9 +3,14 @@ import { type ThreeEvent, useFrame } from '@react-three/fiber';
 import { type CSSProperties, type ReactNode, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { type AnyTestPointId, clampLabel, isFurnacePoint, pointInfo } from '../sim/points';
+import { identifyBlocksClick } from '../store/useIdentify';
 import { activeHot, useSim } from '../store/useSim';
 import { F_TEST_POINT_PLACEMENT } from './furnaceLayout';
 import { TEST_POINT_PLACEMENT, type TestPointPlacement, type Vec3, type WireDef } from './layout';
+import { CLAMP_NOTES, clampReason } from './clampNotes';
+import { toolName } from '../ui/toolNames';
+import { beginClick, endClick } from '../store/clickScope';
+import { playCue } from '../store/useAudio';
 
 const placementOf = (id: AnyTestPointId): TestPointPlacement =>
   isFurnacePoint(id) ? F_TEST_POINT_PLACEMENT[id] : TEST_POINT_PLACEMENT[id];
@@ -21,12 +26,37 @@ type PointerHandlers = {
  * event so things behind it are not hit, and ignores the click that ends an
  * orbit drag.
  */
+/** The sim state's data (not its functions or messages) as text, to tell whether a click changed anything. */
+const contents = (state: object): string =>
+  JSON.stringify(state, (key, value: unknown) => (typeof value === 'function' || key === 'log' ? undefined : value));
+
 export function interactive(label: string, onActivate: () => void): PointerHandlers {
   return {
     onClick: (e) => {
       e.stopPropagation();
-      if (e.delta > 6) return;
-      onActivate();
+      // Ignore the click that ends an orbit drag, or a press-and-hold that only identified the part.
+      if (e.delta > 6 || identifyBlocksClick()) return;
+      // Messages from this click are toasted at once, centred on the click point (see JobLogToasts).
+      const scope = beginClick(e.nativeEvent.clientX, e.nativeEvent.clientY);
+      try {
+        const start = useSim.getState();
+        const sinceId = start.log.at(-1)?.id ?? -1;
+        const before = contents(start);
+        onActivate();
+        const after = useSim.getState();
+        // Contents, not identity (some actions write the same state back), and ignoring the messages.
+        if (contents(after) !== before) return;
+        // Nothing changed: the tool in hand does nothing here. Its message, if any, becomes a warning;
+        // otherwise say so. Either way with the warning tone (unless the action already gave one).
+        const said = after.log.filter((item) => item.id > sinceId);
+        if (said.length === 0) { after.explainNoEffect(label, toolName(after.tool)); return; }
+        if (!said.some((item) => item.kind === 'warn' || item.kind === 'danger')) {
+          after.markWarn(said.map((item) => item.id));
+          playCue('toolMisuse');
+        }
+      } finally {
+        endClick(scope);
+      }
     },
     onPointerOver: (e) => {
       e.stopPropagation();
@@ -38,8 +68,13 @@ export function interactive(label: string, onActivate: () => void): PointerHandl
   };
 }
 
-/** Hover label for something that is only there to be recognised, such as a tool set down by the unit. */
-export const named = (label: string): PointerHandlers => interactive(label, () => undefined);
+/**
+ * Hover label for something that is only there to be recognised, such as a tool set down by the unit.
+ * With the clamp meter in hand, clicking it explains why it cannot be clamped.
+ */
+export const named = (label: string): PointerHandlers => interactive(label, () => {
+  if (useSim.getState().tool === 'clamp') useSim.getState().rejectClamp(label, clampReason(label));
+});
 
 /**
  * A smooth path through the given points. Centripetal parameterisation cannot
@@ -191,15 +226,82 @@ export function Tube(props: {
   );
 }
 
+/**
+ * The clamp jaw's ring. While the meter shows its red ✕ (an irrelevant wire was clicked) it flashes,
+ * to show which wire the reading on the meter still belongs to.
+ */
+function ClampRingMaterial(): ReactNode {
+  const material = useRef<THREE.MeshStandardMaterial>(null);
+  useFrame(({ clock }) => {
+    const m = material.current;
+    if (!m) return;
+    const flashing = useSim.getState().clampRejected;
+    const on = flashing && Math.sin(clock.elapsedTime * 14) > 0;
+    m.color.set(on ? '#ffc832' : '#d32f2f');
+    m.emissive.set(on ? '#ffb300' : '#7a0000');
+    // With the clamp meter in hand the red ring shimmers gently along with its sparkle.
+    const shimmer = !flashing && useSim.getState().tool === 'clamp' ? 0.35 * Math.sin(clock.elapsedTime * 5) : 0;
+    m.emissiveIntensity = on ? 2 : 1 + shimmer;
+  });
+  return <meshStandardMaterial ref={material} color="#d32f2f" emissive="#5c0000" />;
+}
+
+const GLINTS = 12;
+const RING_RADIUS = 0.016;
+const noRaycast = (): void => undefined;
+
+/**
+ * Sparkle on the clamp ring in its normal state, while the clamp meter is the tool in hand: small
+ * glints drift round the ring and twinkle. They hide while the ring flashes gold, and with any other tool.
+ */
+function ClampGlints(): ReactNode {
+  const group = useRef<THREE.Group>(null);
+  const phases = useMemo(() => Array.from({ length: GLINTS }, (_, i) => (i * 2.39996) % (Math.PI * 2)), []);
+  useFrame(({ clock }) => {
+    const g = group.current;
+    if (!g) return;
+    const t = clock.elapsedTime;
+    const { clampRejected, tool } = useSim.getState();
+    const hidden = clampRejected || tool !== 'clamp';
+    g.children.forEach((child, i) => {
+      const phase = phases[i] ?? 0;
+      // Alternate glints ride the outer and inner edge of the ring, in opposite directions.
+      const outer = i % 2 === 0;
+      const angle = (i / GLINTS) * Math.PI * 2 + t * (outer ? 0.8 : -0.55);
+      const r = RING_RADIUS + (outer ? 0.0056 : -0.0046);
+      child.position.set(Math.cos(angle) * r, Math.sin(angle) * r, 0.0035 * Math.sin(t * 2 + phase));
+      // Sharp twinkle: mostly dark, briefly bright.
+      const twinkle = hidden ? 0 : Math.pow(Math.max(0, Math.sin(t * 3.6 + phase)), 4);
+      child.scale.setScalar(0.3 + 1.2 * twinkle);
+      child.rotation.z = t * 2 + phase;
+      ((child as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = twinkle;
+    });
+  });
+  return (
+    <group ref={group}>
+      {phases.map((phase) => (
+        <mesh key={phase} raycast={noRaycast}>
+          <octahedronGeometry args={[0.0032, 0]} />
+          <meshBasicMaterial color="#fff6d8" transparent opacity={0} depthWrite={false} toneMapped={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 /** A control-box wire. With the clamp meter selected it can be clamped. */
 export function Wire({ wire }: { wire: WireDef }): ReactNode {
   const clampTool = useSim((s) => s.tool === 'clamp');
   const clamped = useSim((s) => wire.clamp !== undefined && s.clampAt === wire.clamp);
   const { clamp } = wire;
+  // A wire with nothing useful for the clamp explains why when the clamp meter is used on it.
+  const note = clamp === undefined ? CLAMP_NOTES[wire.id] : undefined;
   const handlers =
-    clamp === undefined
-      ? undefined
-      : interactive(`Wire: ${clampLabel(clamp)}`, () => useSim.getState().clampWire(clamp));
+    clamp !== undefined
+      ? interactive(`Wire: ${clampLabel(clamp)}`, () => useSim.getState().clampWire(clamp))
+      : note && clampTool
+        ? interactive(`Wire: ${note.name}`, () => useSim.getState().rejectClamp(note.name, note.why))
+        : undefined;
   const mid = wire.points[Math.floor(wire.points.length / 2)] ?? [0, 0, 0];
   return (
     <group>
@@ -218,7 +320,8 @@ export function Wire({ wire }: { wire: WireDef }): ReactNode {
           {...(clamp === undefined ? {} : interactive(`Clamp meter jaw around: ${clampLabel(clamp)}`, () => useSim.getState().clampWire(clamp)))}
         >
           <torusGeometry args={[0.016, 0.005, 10, 24]} />
-          <meshStandardMaterial color="#f5a623" emissive="#7a4a00" />
+          <ClampRingMaterial />
+          <ClampGlints />
         </mesh>
       )}
     </group>

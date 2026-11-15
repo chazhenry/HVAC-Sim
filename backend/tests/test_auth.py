@@ -143,7 +143,11 @@ def test_sessions_history_feedback_and_visits_use_authenticated_identity(setup, 
     reply = first.post(f"/api/sessions/{session}/chat", json={"message": "What next?"}).json()
     feedback = {"replyId": reply["replyId"], "rating": "up", "explanation": "Clear", "user": "forged@example.com"}
     assert first.post("/api/feedback", json=feedback).status_code == 201
-    assert first.post("/api/visits", json={"visitId": str(uuid4()), "appVersion": "test", "user": "forged@example.com"}).status_code == 202
+    sign_in = {"visitId": str(uuid4()), "appVersion": "test", "user": "forged@example.com", "note": "login"}
+    assert first.post("/api/visits", json=sign_in).status_code == 202
+    assert first.post("/api/visits", json={**sign_in, "note": " Residential troubleshooting / Generic-ac "}).status_code == 202
+    # Only the 'login' note is replaced, once; later notes for the same row are ignored.
+    assert first.post("/api/visits", json={**sign_in, "note": "EPA 608 preparation / core exam"}).status_code == 202
     assert first.post(f"/api/sessions/{session}/submit", json={"diagnosisId": "no_fault", "finalState": GOOD_FINAL}).status_code == 200
     other = TestClient(app, client=("192.168.20.6", 1234), headers={"Origin": ORIGIN})
     sign_up(other, "other@example.com")
@@ -153,15 +157,16 @@ def test_sessions_history_feedback_and_visits_use_authenticated_identity(setup, 
     assert len(first.get("/api/history").json()) == 1
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT user, user_id FROM feedback").fetchone() == (owner["user"]["email"], owner["user"]["id"])
-        assert db.execute("SELECT user, user_id FROM visits").fetchone() == (owner["user"]["email"], owner["user"]["id"])
+        logged = db.execute("SELECT event, note, user, user_id, app_version FROM visits ORDER BY event").fetchall()
+        assert logged == [("chat", "What next?", owner["user"]["email"], owner["user"]["id"], "unknown"),
+                          ("home", "Residential troubleshooting / Generic-ac", owner["user"]["email"], owner["user"]["id"], "test")]
 
 
-def test_admin_visits_remain_excluded_and_optional_invites_are_enforced(setup, monkeypatch):
+def test_admin_visits_remain_excluded_and_registration_is_open(setup, monkeypatch):
     path, app, _ = setup
     monkeypatch.setenv("HVAC_SIM_ALLOWED_EMAILS", "invited@example.com")
     admin = TestClient(app, client=("127.0.0.1", 1234), headers={"Origin": ORIGIN})
-    assert admin.post("/api/auth/register", json=registration()).status_code == 403
-    sign_up(admin, "invited@example.com")
+    sign_up(admin, "anyone@example.com")
     assert admin.get("/api/visits/access").json()["allowed"] is True
     assert admin.post("/api/visits", json={"visitId": str(uuid4()), "appVersion": "test"}).json()["status"] == "excluded"
     with sqlite3.connect(path) as db:
@@ -179,3 +184,41 @@ def test_existing_database_is_upgraded_without_losing_history(tmp_path):
         for table in ('sessions', 'feedback', 'visits'):
             assert 'user_id' in {row[1] for row in db.execute(f'PRAGMA table_info({table})')}
         assert db.execute("SELECT started_at FROM sessions WHERE id = 'old'").fetchone()[0] == 'before'
+
+
+def test_password_length_is_8_to_24_characters():
+    from app.auth import password_problem
+    assert password_problem("Aa1!" + "x" * 3) is not None   # 7
+    assert password_problem("Aa1!" + "x" * 4) is None       # 8
+    assert password_problem("Aa1!" + "x" * 20) is None      # 24
+    assert password_problem("Aa1!" + "x" * 21) is not None  # 25
+
+
+def test_local_network_sign_in_accepts_any_password(setup):
+    path, app, owner_client = setup
+    sign_up(owner_client)
+    body = lambda password: {"email": "jamie@example.com", "password": password}
+    # This machine, addressed as localhost (also how the Vite dev proxy forwards iPad requests).
+    local = TestClient(app, client=("127.0.0.1", 1234), headers={"Origin": ORIGIN, "Host": "localhost:5173"})
+    assert local.post("/api/auth/login", json=body("")).status_code == 200
+    assert local.post("/api/auth/login", json=body("anything")).status_code == 200
+    # A device on the home network, addressing the PC by its LAN address.
+    lan = TestClient(app, client=("192.168.86.31", 1234), headers={"Origin": ORIGIN, "Host": "192.168.86.226:5173"})
+    assert lan.post("/api/auth/login", json=body("")).status_code == 200
+    # The account must still exist.
+    assert local.post("/api/auth/login", json={"email": "nobody@example.com", "password": ""}).status_code == 401
+
+
+def test_any_password_never_applies_to_the_deployed_site(setup):
+    path, app, owner_client = setup
+    sign_up(owner_client)
+    body = lambda password: {"email": "jamie@example.com", "password": password}
+    # Behind nginx or a tunnel every client can look like 127.0.0.1, but the Host is the public domain.
+    proxied = TestClient(app, client=("127.0.0.1", 1234), headers={"Origin": ORIGIN, "Host": "api.example.com"})
+    assert proxied.post("/api/auth/login", json=body("")).status_code == 401
+    assert proxied.post("/api/auth/login", json=body("wrong password")).status_code == 401
+    # Another network addressing a LAN-looking host still needs the real password.
+    outside = TestClient(app, client=("10.0.0.5", 1234), headers={"Origin": ORIGIN, "Host": "192.168.86.226:5173"})
+    assert outside.post("/api/auth/login", json=body("")).status_code == 401
+    # The real password still works anywhere.
+    assert proxied.post("/api/auth/login", json=body(registration()["password"])).status_code == 200

@@ -174,6 +174,8 @@ export const VIEWS: readonly View[] = [
   { label: 'Top / compressor', camera: [-0.75, 1.75, 0.85], target: [-0.08, 0.45, -0.1] },
   { label: 'Disconnect', camera: [1.05, 1.25, 0.15], target: [1.0, 1.15, -0.65] },
   { label: 'Service valves', camera: [1.35, 0.55, 0.8], target: [0.55, 0.26, 0.15] },
+  // Square-on to the manifold's dial faces (MANIFOLD_POS, tilted -0.5/-0.5 rad), close enough to read them.
+  { label: 'Gauges', camera: [0.78, 0.34, 0.79], target: [0.98, 0.16, 0.47] },
 ];
 export const HOME_VIEW: View = { label: 'Whole unit', camera: [1.5, 1.25, 2.3], target: [0.2, 0.55, 0] };
 

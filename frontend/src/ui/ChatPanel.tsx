@@ -1,7 +1,8 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useChat } from '../store/useChat';
+import { browserCanTranscribe, useDictation } from '../store/useDictation';
 import { useSim } from '../store/useSim';
-import { JOB_LOG_TOAST_CLOSED } from './JobLogToasts';
+import { JOB_LOG_TOAST_CLOSED } from './toastPlacement';
 import { ChatMessage } from './ChatMessage';
 import { ReplyFeedback } from './ReplyFeedback';
 import { isPowerCommand, usePowerCommands } from '../store/usePowerCommands';
@@ -50,6 +51,22 @@ function Chat(): ReactNode {
   const messages = chatJob === jobId ? all : [];
 
   const [draft, setDraft] = useState('');
+  // Words spoken into a microphone (here or in the top bar) land in the box, for the learner to check and send.
+  const heard = useDictation((s) => s.heard);
+  const listening = useDictation((s) => s.listening);
+  const interim = useDictation((s) => s.interim);
+  const micError = useDictation((s) => s.error);
+  const micHint = useDictation((s) => s.hint);
+  const focusChat = useDictation((s) => s.focusChat);
+  useEffect(() => {
+    if (!heard.text) return;
+    setDraft((current) => (current.trim() ? `${current.trimEnd()} ${heard.text}` : heard.text));
+    box.current?.focus();
+  }, [heard]);
+  // Without browser transcription the OS dictation types into the focused box, so focus it.
+  useEffect(() => {
+    if (focusChat) box.current?.focus();
+  }, [focusChat]);
   const commandDraft = isPowerCommand(draft);
   const waiting = pending && !commandDraft;
   /** Position in the prompt history; -1 is the text being typed now. */
@@ -115,6 +132,11 @@ function Chat(): ReactNode {
         {pending && <p className="bubble assistant thinking"><Spinner /> Thinking…</p>}
         <div ref={end} />
       </div>
+      {(listening || micError || micHint) && (
+        <p className={`chat-mic-note${micError ? ' error' : ''}`} role="status">
+          {listening ? (interim ? `“${interim}”` : 'Listening… speak your question.') : [micError, micHint].filter(Boolean).join(' ')}
+        </p>
+      )}
       <div className="chat-input">
         <textarea
           ref={box}
@@ -142,6 +164,25 @@ function Chat(): ReactNode {
             <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
             <circle cx={12} cy={12} r={3} />
             {!listMode && <path d="m3 3 18 18" />}
+          </svg>
+        </button>
+        <button
+          type="button"
+          className={`chat-mic no-callout${listening ? ' listening' : ''}`}
+          aria-pressed={listening}
+          aria-label={listening ? 'Stop voice input' : 'Speak your question'}
+          title={listening ? 'Stop voice input' : browserCanTranscribe() ? 'Speak your question' : 'Dictate with your device'}
+          onClick={() => {
+            // Focus first, inside the tap, so an iPad keyboard (with its dictation key) can open.
+            if (!browserCanTranscribe()) box.current?.focus();
+            useDictation.getState().toggle();
+          }}
+        >
+          <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.9}
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x={9} y={3} width={6} height={11} rx={3} />
+            <path d="M5 11a7 7 0 0 0 14 0" />
+            <path d="M12 18v3" />
           </svg>
         </button>
         <button

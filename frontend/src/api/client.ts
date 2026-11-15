@@ -16,6 +16,7 @@ import type {
   VisitsPage,
 } from './types';
 import { useAuth } from '../store/useAuth';
+import { APP_VERSION } from '../version';
 
 export class ApiError extends Error {
   constructor(
@@ -76,13 +77,13 @@ export const api = {
   visits: (search: string, offset: number, limit: number, signal: AbortSignal) =>
     request<VisitsPage>(`/visits?${new URLSearchParams({ search, offset: String(offset), limit: String(limit) })}`,
       { cache: 'no-store', signal }),
-  trackVisit: (visitId: string, appVersion: string, event = 'home', user?: string) =>
-    request<{ status: string }>('/visits', { ...post({ visitId, appVersion, event, user }), keepalive: true }),
+  trackVisit: (visitId: string, appVersion: string, event = 'home', user?: string, note?: string) =>
+    request<{ status: string }>('/visits', { ...post({ visitId, appVersion, event, user, note }), keepalive: true }),
   catalog: () => request<CatalogResponse>('/catalog'),
   startSession: (scenarioId: string, context?: EquipmentContext) => request<SessionResponse>('/sessions', post({ scenarioId, context })),
   hint: (sessionId: string) => request<HintResponse>(`/sessions/${sessionId}/hint`, post()),
   chat: (sessionId: string, body: ChatRequest) =>
-    request<ChatResponse>(`/sessions/${sessionId}/chat`, post(body)),
+    request<ChatResponse>(`/sessions/${sessionId}/chat`, post({ ...body, appVersion: APP_VERSION })),
   examSections: () => request<ExamSectionInfo[]>('/exam'),
   examPaper: (section: ExamSection) => request<ExamPaper>(`/exam/${section}`),
   gradeExam: (section: ExamSection, answers: Record<string, number>) =>

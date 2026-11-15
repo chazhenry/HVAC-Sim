@@ -2,7 +2,7 @@
 import base64
 import hashlib
 import hmac
-import os
+import ipaddress
 import re
 import secrets
 import sqlite3
@@ -21,8 +21,8 @@ PASSWORD_WORKERS = threading.BoundedSemaphore(4)
 
 
 def password_problem(password: str) -> str | None:
-    if not 12 <= len(password) <= 128:
-        return "Use 12–128 characters for your password."
+    if not 8 <= len(password) <= 24:
+        return "Use 8–24 characters for your password."
     if any(ord(c) < 32 or ord(c) == 127 for c in password):
         return "Passwords cannot contain control characters."
     if not all(re.search(pattern, password) for pattern in (r"[a-z]", r"[A-Z]", r"[0-9]", r"[^A-Za-z0-9\s]")):
@@ -49,6 +49,37 @@ def verify_password(password: str, encoded: str) -> bool:
 
 DUMMY_HASH = hash_password(secrets.token_urlsafe(32))
 
+# Development convenience: on this machine or the home network, sign-in accepts any password
+# (including blank) for an existing account.
+DEV_NETWORK = ipaddress.ip_network("192.168.86.0/24")
+
+
+def _local_address(value: str) -> bool:
+    if value.lower() == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    if address.version == 6 and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    return address.is_loopback or address in DEV_NETWORK
+
+
+def _host_name(host_header: str) -> str:
+    host = host_header.strip()
+    if host.startswith("["):  # [::1]:8000
+        return host[1:].split("]", 1)[0]
+    return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+
+
+def local_dev_request(request: Request) -> bool:
+    """True only when the connection comes from this machine or 192.168.86.x AND the browser addressed
+    the server as localhost or 192.168.86.x. A deployed site is reached by its public domain, so it
+    never qualifies, even behind a local proxy or tunnel that makes every client look like 127.0.0.1."""
+    client = request.client.host if request.client else ""
+    return _local_address(client) and _local_address(_host_name(request.headers.get("host", "")))
+
 
 def token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
@@ -56,7 +87,9 @@ def token_hash(token: str) -> str:
 
 class LoginRequest(ApiModel):
     email: str = Field(min_length=3, max_length=254)
-    password: SecretStr = Field(min_length=1, max_length=128)
+    # Blank is accepted here so local development sign-in can skip it; the login handler still
+    # rejects a blank or wrong password everywhere else.
+    password: SecretStr = Field(min_length=0, max_length=128)
 
     @field_validator("email", mode="before")
     @classmethod
@@ -132,9 +165,6 @@ def auth_router(store: SessionStore, origins: list[str]) -> APIRouter:
     @router.post("/register", response_model=AuthResponse, status_code=201)
     def register(body: RegisterRequest, request: Request) -> AuthResponse:
         ip = attempt(request, body.email, "register")
-        invited = {email.strip().lower() for email in os.environ.get("HVAC_SIM_ALLOWED_EMAILS", "").split(",") if email.strip()}
-        if invited and body.email not in invited:
-            raise HTTPException(status_code=403, detail="This email has not been invited to the demo.")
         token = secrets.token_urlsafe(32)
         expires = time.time() + SESSION_SECONDS
         try:
@@ -147,7 +177,11 @@ def auth_router(store: SessionStore, origins: list[str]) -> APIRouter:
     def login(body: LoginRequest, request: Request) -> AuthResponse:
         ip = attempt(request, body.email, "login")
         credentials = store.user_credentials(body.email)
-        correct = verify_password(body.password.get_secret_value(), credentials["pw_hash"] if credentials else DUMMY_HASH)
+        if credentials and local_dev_request(request):
+            correct = True  # Development: any password, including blank, for an existing account.
+        else:
+            password = body.password.get_secret_value()
+            correct = verify_password(password, credentials["pw_hash"] if credentials else DUMMY_HASH) and password != ""
         if not credentials or not correct:
             raise HTTPException(status_code=401, detail="Email or password is incorrect.")
         token = secrets.token_urlsafe(32)

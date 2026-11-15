@@ -47,7 +47,7 @@ def test_visits_persist_geolocation_and_deduplicate(tmp_path: Path, monkeypatch:
     assert calls[0] == "https://ipwho.is/8.8.8.8"
     assert dict(result[0]) == {
         "id": body["visitId"], "visited_at": result[0]["visited_at"], "ip": "8.8.8.8",
-        "city": "New York", "state": "New York", "country": "United States", "app_version": "26.11.11", "event": "home", "user": None, "user_id": None,
+        "city": "New York", "state": "New York", "country": "United States", "app_version": "26.11.11", "event": "home", "user": None, "user_id": None, "note": None,
     }
     assert result[0]["visited_at"].endswith("+00:00")
     # Opening the existing database preserves visits and the sessions schema.
@@ -292,3 +292,57 @@ def test_user_migration_preserves_existing_named_event(tmp_path: Path) -> None:
     assert total == 1
     assert result[0]["event"] == "start_job"
     assert result[0]["user"] is None
+
+
+def test_chat_prompts_are_logged_as_chat_events(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "visits.db"
+    monkeypatch.setattr(visits.httpx, "get", lambda url, **kwargs: httpx.Response(500, request=httpx.Request("GET", url)))
+
+    async def complete(messages: object) -> tuple[str, str]:
+        return "Check the capacitor.", "test"
+
+    from app import llm
+    monkeypatch.setattr(llm, "complete", complete)
+    client = TestClient(create_app(path), client=("8.8.8.8", 1234))
+    session = client.post("/api/sessions", json={"scenarioId": "orientation"}).json()["sessionId"]
+    body = {"message": "Why is the fan not spinning?", "state": {}, "appVersion": "26.11.13"}
+    assert client.post(f"/api/sessions/{session}/chat", json=body).status_code == 200
+    [row] = rows(path)
+    assert (row["event"], row["note"], row["app_version"]) == ("chat", "Why is the fan not spinning?", "26.11.13")
+    assert client.get("/api/visits?search=fan").status_code == 403  # browsing stays admin-only
+    admin = TestClient(create_app(path), client=("127.0.0.1", 1234))
+    page = admin.get("/api/visits", params={"search": "fan not"}).json()
+    assert page["total"] == 1 and page["items"][0]["note"] == "Why is the fan not spinning?"
+
+
+def test_admin_chat_is_not_logged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "visits.db"
+
+    async def complete(messages: object) -> tuple[str, str]:
+        return "ok", "test"
+
+    from app import llm
+    monkeypatch.setattr(llm, "complete", complete)
+    client = TestClient(create_app(path), client=("127.0.0.1", 1234))
+    session = client.post("/api/sessions", json={"scenarioId": "orientation"}).json()["sessionId"]
+    assert client.post(f"/api/sessions/{session}/chat", json={"message": "hi", "state": {}}).status_code == 200
+    assert rows(path) == []
+
+
+def test_existing_visits_table_gains_note_column(tmp_path: Path) -> None:
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE visits (id TEXT PRIMARY KEY, visited_at TEXT NOT NULL, ip TEXT NOT NULL, city TEXT, state TEXT, "
+                   "country TEXT, app_version TEXT NOT NULL, event TEXT NOT NULL DEFAULT 'home', user TEXT)")
+        db.execute("INSERT INTO visits (id, visited_at, ip, app_version) VALUES ('old', 'then', '8.8.8.8', 'v1')")
+    SessionStore(path)
+    [row] = rows(path)
+    assert row["id"] == "old" and row["note"] is None
+
+
+def test_sign_in_note_cannot_be_relabelled_from_another_ip(tmp_path: Path) -> None:
+    path = tmp_path / "visits.db"
+    body = {**payload(), "note": "login"}
+    assert TestClient(create_app(path), client=("8.8.8.8", 1)).post("/api/visits", json=body).status_code == 202
+    assert TestClient(create_app(path), client=("9.9.9.9", 1)).post("/api/visits", json={**body, "note": "forged"}).status_code == 202
+    assert [row["note"] for row in rows(path)] == ["login"]

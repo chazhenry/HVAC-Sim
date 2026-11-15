@@ -1,6 +1,7 @@
 import { isValidElement, memo, type ReactNode, useEffect, useState } from 'react';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { copyText } from '../browser';
 
 function CodeBlock({ children }: { children?: ReactNode }): ReactNode {
   const [copied, setCopied] = useState<'ready' | 'copied' | 'failed'>('ready');
@@ -21,7 +22,7 @@ function CodeBlock({ children }: { children?: ReactNode }): ReactNode {
         <button type="button" aria-label={`Copy ${language} code`} onClick={() => {
           void (async () => {
             try {
-              await navigator.clipboard.writeText(text);
+              await copyText(text);
               setCopied('copied');
             } catch {
               setCopied('failed');

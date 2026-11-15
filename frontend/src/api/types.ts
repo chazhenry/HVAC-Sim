@@ -94,6 +94,8 @@ export interface EquipmentContext {
   schemaVersion: 1;
   id: string;
   name: string;
+  /** Short display label used in the visits log, e.g. "Generic-ac". */
+  slug?: string | null;
   systemType: 'air_conditioner' | 'heat_pump' | 'gas_furnace';
   unitType: UnitType;
   manufacturer: string;
@@ -161,6 +163,8 @@ export interface ChatRequest {
   history: ChatTurn[];
   /** What the learner can see and has measured right now. */
   state: Record<string, unknown>;
+  /** Front-end release, logged with the 'chat' event. */
+  appVersion?: string;
 }
 
 export interface ChatResponse {
@@ -307,6 +311,7 @@ export interface VisitEntry {
   appVersion: string;
   event: string;
   user: string | null;
+  note: string | null;
 }
 
 export interface VisitsPage {

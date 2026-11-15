@@ -55,7 +55,7 @@ and the frontend is built into a folder of the website (e.g. `/hvac/`).
 ## Accounts
 
 Create an account with email, first/last name, password and confirmation, then sign in with email
-and password. Passwords require 12–128 characters, uppercase/lowercase, a number and a symbol.
+and password. Passwords require 8–24 characters, uppercase/lowercase, a number and a symbol.
 SQLite `users` contains `id INTEGER PRIMARY KEY AUTOINCREMENT`, `email` (unique, case-insensitive),
 `fname`, `lname`, `ipaddress`, `login_count` and `pw_hash`. Salted scrypt hashes are stored;
 registration signs in and counts as the first login. Later sign-ins update IP and login count.
@@ -69,8 +69,8 @@ to their account; visits and feedback use the account email and `user_id`, ignor
 Admin/localhost analytics exclusions still apply. Existing records are retained by automatic migration.
 
 Use HTTPS in deployment and keep `HVAC_SIM_CORS_ORIGINS` set to the homepage origin; login/register
-check that origin. Optional `HVAC_SIM_ALLOWED_EMAILS` (comma-separated) restricts registration to
-invited addresses. Google login is deferred. Email verification and password reset are not included.
+check that origin. Registration is open to
+anyone. Google login is deferred. Email verification and password reset are not included.
 
 ## Tests
 

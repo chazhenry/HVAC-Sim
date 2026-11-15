@@ -26,6 +26,7 @@ class VisitEntry(ApiModel):
     app_version: str
     event: str
     user: str | None
+    note: str | None = None
 
 
 class VisitsPage(ApiModel):
@@ -40,8 +41,9 @@ class VisitRequest(ApiModel):
     app_version: str = Field(min_length=1, max_length=32)
     event: str = Field(default="home", min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$")
     user: str | None = Field(default=None, min_length=1, max_length=254)
+    note: str | None = Field(default=None, max_length=200)
 
-    @field_validator("user", mode="before")
+    @field_validator("user", "note", mode="before")
     @classmethod
     def trim_user(cls, value: object) -> object:
         return value.strip() if isinstance(value, str) else value

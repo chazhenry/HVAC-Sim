@@ -48,7 +48,7 @@ function VisitsDialog({ onClose, onDenied }: { onClose: () => void; onDenied: ()
         event.preventDefault();
         setQuery({ search: draft.trim(), offset: 0 });
       }}>
-        <input autoFocus aria-label="Search visits" placeholder="Search user, IP, city, state, country, date, version or event"
+        <input autoFocus aria-label="Search visits" placeholder="Search user, IP, city, state, country, date, version, event or note"
           maxLength={200} value={draft} onChange={(event) => setDraft(event.target.value)} />
         <button type="submit">Search</button>
         <button type="button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Refresh</button>
@@ -60,16 +60,16 @@ function VisitsDialog({ onClose, onDenied }: { onClose: () => void; onDenied: ()
       <div className="visits-table-scroll" aria-busy={loading} tabIndex={0} aria-label="Visit records">
         <table className="visits-table">
           <thead><tr>
-            <th scope="col">Time (your timezone)</th><th scope="col">User</th><th scope="col">Event</th><th scope="col">IP</th><th scope="col">City</th>
+            <th scope="col">Time (your timezone)</th><th scope="col">User</th><th scope="col">Event</th><th scope="col">Note</th><th scope="col">IP</th><th scope="col">City</th>
             <th scope="col">State / region</th><th scope="col">Country</th><th scope="col">App version</th>
           </tr></thead>
           <tbody>
             {page?.items.map((visit) => <tr key={visit.id}>
               <td><time dateTime={visit.visitedAt}>{new Date(visit.visitedAt).toLocaleString()}</time></td>
-              <td>{visit.user ?? '—'}</td><td>{visit.event}</td><td>{visit.ip}</td><td>{visit.city ?? '—'}</td><td>{visit.state ?? '—'}</td>
+              <td>{visit.user ?? '—'}</td><td>{visit.event}</td><td className="visit-note" title={visit.note ?? undefined}>{visit.note ?? '—'}</td><td>{visit.ip}</td><td>{visit.city ?? '—'}</td><td>{visit.state ?? '—'}</td>
               <td>{visit.country ?? '—'}</td><td>{visit.appVersion}</td>
             </tr>)}
-            {!loading && !error && page?.items.length === 0 && <tr><td colSpan={8}>No visits found.</td></tr>}
+            {!loading && !error && page?.items.length === 0 && <tr><td colSpan={9}>No visits found.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -113,8 +113,9 @@ export function VisitsAdmin(): ReactNode {
     <button type="button" className="visits-admin-button" aria-label="Browse visits log" title="Visits log"
       aria-haspopup="dialog" onClick={() => setOpen(true)}>
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-        <path d="m9 3-.5 2-1.7 1-2-.6-2 3.4 1.5 1.4v2l-1.5 1.4 2 3.4 2-.6 1.7 1 .5 2h4l.5-2 1.7-1 2 .6 2-3.4-1.5-1.4v-2l1.5-1.4-2-3.4-2 .6-1.7-1L13 3Z" />
-        <circle cx="11" cy="11.5" r="3" />
+        {/* A log sheet, so it is not mistaken for the Settings gear in the top bar. */}
+        <rect x="5" y="3.5" width="14" height="17" rx="2" />
+        <path d="M8.5 8h7M8.5 12h7M8.5 16h4" />
       </svg>
     </button>
     {open && <VisitsDialog onClose={() => setOpen(false)} onDenied={onDenied} />}

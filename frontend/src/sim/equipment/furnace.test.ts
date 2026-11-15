@@ -85,16 +85,21 @@ describe('complete furnace jobs through store, instruments, physics and procedur
       case 'f-flame-sensor': meter('ua', 'F_FS_ROD', 'F_BD_FS'); break;
       case 'f-igniter': meter('vac', 'F_IGN_H', 'F_IGN_N'); break;
       case 'f-inducer': meter('vac', 'F_IND_H', 'F_IND_N'); break;
-      case 'f-pressure-switch': meter('vac', 'F_PS_A', 'F_PS_B'); click('pressureTap', 'manometer'); break;
+      case 'f-pressure-switch': meter('vac', 'F_PS_A', 'F_PS_B'); run(60); click('pressureTap', 'manometer'); break;
       case 'f-gas-off':
-      case 'f-gas-valve': meter('vac', 'F_GV_MV', 'F_GV_C'); click('inletTap', 'manometer'); break;
+      case 'f-gas-valve':
+        // One instrument at a time: manometer on the inlet, then the manifold while it tries to light;
+        // cycle power for fresh ignition attempts, then check the valve voltage.
+        click('inletTap', 'manometer'); click('manifoldTap', 'manometer'); run(60);
+        click('serviceSwitch'); click('serviceSwitch'); meter('vac', 'F_GV_MV', 'F_GV_C'); break;
       case 'f-filter': click('filter'); break;
-      case 'f-blower-cap': meter('vac', 'F_BLW_H', 'F_BLW_N'); job().setTool('clamp'); job().clampWire('F_W_BLW'); break;
+      case 'f-blower-cap': meter('vac', 'F_BLW_H', 'F_BLW_N'); run(60); job().setTool('clamp'); job().clampWire('F_W_BLW'); break;
       case 'f-fuse': meter('vac', 'F_BD_SEC', 'F_BD_C'); meter('vac', 'F_BD_R', 'F_BD_C'); break;
     }
-    if (id === 'f-orientation' || id === 'f-filter') { click('supplyDuct', 'thermo'); click('returnDuct', 'thermo'); }
-    if (id === 'f-orientation' || id === 'f-gas-valve') click('manifoldTap', 'manometer');
+    // Picking up another tool takes the previous instrument off, so run the heat with each one connected.
     run(60);
+    if (id === 'f-orientation' || id === 'f-filter') { click('supplyDuct', 'thermo'); click('returnDuct', 'thermo'); run(60); }
+    if (id === 'f-orientation') { click('manifoldTap', 'manometer'); run(60); }
     if (repair) {
       click('serviceSwitch'); meter('vac', 'F_SW_LOAD', 'F_SW_N');
       if (id === 'f-igniter') meter('ohm', 'F_IGN_H', 'F_IGN_N');

@@ -35,6 +35,8 @@ class ChatRequest(ApiModel):
     history: list[ChatTurn] = Field(default_factory=list, max_length=40)
     # Snapshot of the unit and the job as the learner sees them right now.
     state: dict[str, Any] = Field(default_factory=dict)
+    # Front-end release, recorded with the 'chat' event in the visits log.
+    app_version: str = Field(default="unknown", min_length=1, max_length=32)
 
 
 class ChatResponse(ApiModel):

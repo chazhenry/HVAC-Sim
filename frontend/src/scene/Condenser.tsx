@@ -3,6 +3,8 @@ import { type ReactNode, type RefObject, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { TEST_POINTS, type TestPointId } from '../sim/testPoints';
 import { useSim } from '../store/useSim';
+import { liquidPsig, suctionPsig } from '../sim/engine';
+import { GaugeFace } from './GaugeFace';
 import {
   BASE_Y,
   COMPRESSOR_POS,
@@ -337,7 +339,11 @@ function ServiceValves(): ReactNode {
   const tool = useSim((s) => s.tool);
   const gauges = useSim((s) => s.gauges);
   const clamps = useSim((s) => s.tempClamps);
-  const showManifold = tool === 'gauges' || tool === 'tempclamp' || gauges.low || gauges.high;
+  // Rounded so the gauge faces redraw only when the reading a technician would see changes.
+  const lowPsig = useSim((s) => (s.sim && s.gauges.low ? Math.round(suctionPsig(s.sim) * 10) / 10 : null));
+  const highPsig = useSim((s) => (s.sim && s.gauges.high ? Math.round(liquidPsig(s.sim)) : null));
+  // Drawn with the gauges in hand, or while a hose is connected; not for other tools (e.g. the temp clamps).
+  const showManifold = tool === 'gauges' || gauges.low || gauges.high;
 
   const valve = (pos: readonly [number, number, number], side: 'low' | 'high'): ReactNode => {
     const [x, y, z] = pos;
@@ -414,11 +420,15 @@ function ServiceValves(): ReactNode {
             <boxGeometry args={[0.2, 0.05, 0.04]} />
             <meshStandardMaterial color="#8a8f95" metalness={0.7} roughness={0.35} />
           </mesh>
-          {([[-0.055, '#1f5fbf'], [0.055, '#c62828']] as const).map(([dx, color]) => (
-            <mesh key={color} position={[dx, 0.07, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.048, 0.048, 0.03, 28]} />
-              <meshStandardMaterial color={color} roughness={0.4} />
-            </mesh>
+          {([[-0.055, '#1f5fbf', lowPsig, 350, 'LOW'], [0.055, '#c62828', highPsig, 800, 'HIGH']] as const).map(([dx, color, psig, max, side]) => (
+            <group key={color}>
+              <mesh position={[dx, 0.07, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.048, 0.048, 0.03, 28]} />
+                <meshStandardMaterial color={color} roughness={0.4} />
+              </mesh>
+              {/* The dial face, on the cap facing the technician. */}
+              <GaugeFace psig={psig} max={max} color={color} side={side} radius={0.046} position={[dx, 0.07, 0.0155]} />
+            </group>
           ))}
         </group>
       )}

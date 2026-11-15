@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS visits (
     country     TEXT,
     app_version TEXT NOT NULL,
     event       TEXT NOT NULL DEFAULT 'home',
-    user        TEXT
+    user        TEXT,
+    note        TEXT
 );
 CREATE INDEX IF NOT EXISTS visits_ip_time ON visits (ip, visited_at);
 CREATE INDEX IF NOT EXISTS visits_time ON visits (visited_at DESC, id DESC);
@@ -94,6 +95,8 @@ class SessionStore(AuthStoreMixin):
                 self._db.execute("ALTER TABLE visits ADD COLUMN event TEXT NOT NULL DEFAULT 'home'")
             if "user" not in columns:
                 self._db.execute("ALTER TABLE visits ADD COLUMN user TEXT")
+            if "note" not in columns:
+                self._db.execute("ALTER TABLE visits ADD COLUMN note TEXT")
             for table in ("sessions", "visits", "feedback"):
                 if "user_id" not in {row["name"] for row in self._db.execute(f"PRAGMA table_info({table})")}:
                     self._db.execute(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER REFERENCES users(id)")
@@ -134,13 +137,20 @@ class SessionStore(AuthStoreMixin):
             return self._db.execute("SELECT id FROM feedback WHERE reply_id = ? AND user = ?",
                                     (reply_id, user)).fetchone()["id"]
 
-    def record_visit(self, visit_id: str, ip: str, app_version: str, event: str = "home", user: str | None = None, user_id: int | None = None) -> bool:
+    def record_visit(self, visit_id: str, ip: str, app_version: str, event: str = "home", user: str | None = None, user_id: int | None = None,
+                     note: str | None = None) -> bool:
         """Persist before geolocation; retrying a visit ID cannot count it twice."""
         with self._lock, self._db:
             cursor = self._db.execute(
-                "INSERT OR IGNORE INTO visits (id, visited_at, ip, app_version, event, user, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (visit_id, _now(), ip, app_version, event, user, user_id),
+                "INSERT OR IGNORE INTO visits (id, visited_at, ip, app_version, event, user, user_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (visit_id, _now(), ip, app_version, event, user, user_id, note),
             )
+            if cursor.rowcount == 0 and note:
+                # A sign-in row is logged as 'login' and relabelled once, with the mode and equipment chosen.
+                self._db.execute(
+                    "UPDATE visits SET note = ? WHERE id = ? AND event = ? AND ip = ? AND user_id IS ? AND note = 'login'",
+                    (note, visit_id, event, ip, user_id),
+                )
         return cursor.rowcount == 1
 
     def browse_visits(self, search: str, limit: int, offset: int) -> tuple[list[dict], int]:
@@ -148,7 +158,7 @@ class SessionStore(AuthStoreMixin):
         where = (
             "WHERE instr(lower(ip || ' ' || COALESCE(city, '') || ' ' || "
             "COALESCE(state, '') || ' ' || COALESCE(country, '') || ' ' || "
-            "app_version || ' ' || visited_at || ' ' || event || ' ' || COALESCE(user, '')), lower(?)) > 0"
+            "app_version || ' ' || visited_at || ' ' || event || ' ' || COALESCE(user, '') || ' ' || COALESCE(note, '')), lower(?)) > 0"
         )
         with self._lock:
             total = self._db.execute("SELECT COUNT(*) FROM visits " + where, (search,)).fetchone()[0]

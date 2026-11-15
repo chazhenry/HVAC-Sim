@@ -1,4 +1,6 @@
 import { applyFurnaceAction } from '../sim/equipment/furnaceActions';
+import { playCue } from './useAudio';
+import { isLocalDevHost } from '../browser';
 import { furnaceMeasurements } from '../sim/equipment/furnaceMeasurements';
 import { create } from 'zustand';
 import { useTrainingProgress } from './useTrainingProgress';
@@ -135,6 +137,33 @@ export const TSTAT_MIN_F = 50;
 export const TSTAT_MAX_F = 90;
 
 const STYLE_KEY = 'hvac-sim.thermostat-style';
+const TSTAT_KEY = 'hvac-sim.thermostat';
+const TOOL_KEY = 'hvac-sim.last-tool';
+
+/** Thermostat mode and setpoint as last left; new jobs start there. A per-browser convenience. */
+function savedThermostat(): { mode: TstatMode; setpointF: number } | null {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(TSTAT_KEY) ?? 'null') as { mode?: unknown; setpointF?: unknown } | null;
+    if (!raw || !['off', 'cool', 'heat'].includes(raw.mode as string) || typeof raw.setpointF !== 'number') return null;
+    return { mode: raw.mode as TstatMode, setpointF: raw.setpointF };
+  } catch {
+    return null;
+  }
+}
+
+/** The tool last in hand for this kind of equipment (condenser and furnace have different tool bags). */
+function savedTool(unitType: string): ToolId {
+  try {
+    const tool = window.localStorage.getItem(`${TOOL_KEY}.${unitType}`);
+    return tool ? (tool as ToolId) : 'hand';
+  } catch {
+    return 'hand';
+  }
+}
+
+function remember(key: string, value: string): void {
+  try { window.localStorage.setItem(key, value); } catch { /* Storage can be blocked; nothing is remembered then. */ }
+}
 
 /** The face the learner last picked; a per-browser convenience only. */
 function savedStyle(): TstatStyle {
@@ -168,6 +197,8 @@ export interface AppState {
   leads: { red: AnyTestPointId | null; black: AnyTestPointId | null };
   nextLead: 'red' | 'black';
   clampAt: AnyClampId | null;
+  /** The clamp was just put on a wire it cannot usefully read: the meter shows a red ✕ briefly. */
+  clampRejected: boolean;
   ncvAt: AnyTestPointId | null;
   gauges: { low: boolean; high: boolean };
   tempClamps: { suction: boolean; liquid: boolean };
@@ -206,6 +237,12 @@ export interface AppState {
   clickPullout: () => void;
   probe: (id: AnyTestPointId) => void;
   clampWire: (id: AnyClampId) => void;
+  /** Clamp tool clicked on a wire with nothing useful to read; `why` explains tersely. */
+  rejectClamp: (name: string, why: string) => void;
+  /** A click on a named object did nothing with the tool in hand: say so, with a warning tone. */
+  explainNoEffect: (label: string, toolName: string) => void;
+  /** Re-grade messages as warnings (a click that only explained why it did nothing). */
+  markWarn: (ids: readonly number[]) => void;
   clickPort: (side: 'low' | 'high') => void;
   clickPipe: (line: 'suction' | 'liquid') => void;
   clickPart: (target: PartTarget) => void;
@@ -263,6 +300,9 @@ export function activeClamp(s: AppState, id: AnyClampId): number {
 export const activeTime = (s: AppState): number => s.sim?.t ?? s.furnace?.t ?? 0;
 
 let logId = 0;
+/** How long the clamp meter shows its red ✕ after an irrelevant wire. */
+const CLAMP_REJECT_MS = 2500;
+let clampRejectToken = 0;
 
 const fresh = {
   tstat: { mode: 'off' as TstatMode, setpointF: 72 },
@@ -271,6 +311,7 @@ const fresh = {
   leads: { red: null, black: null },
   nextLead: 'red' as const,
   clampAt: null,
+  clampRejected: false,
   ncvAt: null,
   gauges: { low: false, high: false },
   tempClamps: { suction: false, liquid: false },
@@ -300,6 +341,7 @@ export const useSim = create<AppState>()((set, get) => {
   const violation = (text: string): void => {
     set((s) => ({ violations: [...s.violations, text] }));
     say(`UNSAFE: ${text}`, 'danger');
+    playCue('unsafe');
   };
 
   const addRepair = (repair: RepairAction): void => {
@@ -354,7 +396,9 @@ export const useSim = create<AppState>()((set, get) => {
 
   const needTool = (wanted: ToolId, text: string): boolean => {
     if (get().tool === wanted) return true;
-    say(text);
+    // A wrong-tool click is a tool error: shown as a warning, centred where the user clicked.
+    say(text, 'warn');
+    playCue('toolMisuse');
     return false;
   };
 
@@ -424,14 +468,26 @@ export const useSim = create<AppState>()((set, get) => {
           context: session.context,
           procedureId: session.procedureId,
           tstat: { mode: 'off' as TstatMode, setpointF: Math.round(session.environment.setpointF) },
+          // Start with the tool last used on this kind of equipment.
+          tool: savedTool(session.unitType),
+          // On localhost / the home network, start with the electrical access panel already off to save clicks.
+          panels: { ...fresh.panels, access: !isLocalDevHost() },
         };
         if (session.unitType === 'furnace') {
           set({ ...common, sim: null, furnace: createFurnace(session.furnace, session.environment) });
-          say('You arrive on site. The furnace has power and the thermostat is off.');
         } else {
           set({ ...common, furnace: null, sim: createSim(session.unit, session.environment, session.context) });
-          say('You arrive on site. The disconnect is in and the thermostat is off.');
         }
+        // Put the thermostat back as it was last left, if this equipment can run that mode.
+        const last = savedThermostat();
+        const canRun = (mode: TstatMode): boolean => mode === 'off'
+          || (session.unitType === 'furnace' ? mode === 'heat' : mode === 'cool' || get().sim?.heatPump != null);
+        if (last) get().setThermostat({ mode: canRun(last.mode) ? last.mode : 'off', setpointF: last.setpointF });
+        const { mode, setpointF } = get().tstat;
+        const thermostat = mode === 'off' ? 'the thermostat is off' : `the thermostat is set to ${mode === 'heat' ? 'Heat' : 'Cool'} ${setpointF} °F`;
+        say(session.unitType === 'furnace'
+          ? `You arrive on site. The furnace has power and ${thermostat}.`
+          : `You arrive on site. The disconnect is in and ${thermostat}.`);
       } catch (e) {
         set({ busy: false, error: e instanceof Error ? e.message : String(e) });
       }
@@ -471,7 +527,28 @@ export const useSim = create<AppState>()((set, get) => {
       }
     },
 
-    setTool: (tool) => set({ tool, hover: null }),
+    setTool: (tool) => {
+      const { tool: previous, sim } = get();
+      // Picking up a different tool clears everything the previous one had on the unit: its renders and
+      // its readings start fresh with the next tool.
+      if (previous !== tool) {
+        set({
+          ...(previous === 'clamp' ? { clampAt: null, clampRejected: false } : {}),
+          ...(previous === 'ncv' ? { ncvAt: null } : {}),
+          ...(previous === 'multimeter' ? { leads: { red: null, black: null }, nextLead: 'red' as const } : {}),
+          ...(previous === 'tempclamp' ? { tempClamps: { suction: false, liquid: false } } : {}),
+          ...(previous === 'manometer' ? { manoAt: null } : {}),
+          ...(previous === 'thermo' ? { probes: { supply: false, return: false } } : {}),
+          // Hoses off: the service cart stops and its centre hose is capped.
+          ...(previous === 'gauges' ? {
+            gauges: { low: false, high: false },
+            ...(sim ? { sim: { ...sim, service: { ...sim.service, running: false, hose: 'none' as const } } } : {}),
+          } : {}),
+        });
+      }
+      set({ tool, hover: null });
+      if (get().sessionId !== null) remember(`${TOOL_KEY}.${get().unitType}`, tool);
+    },
     setHover: (hover) => set({ hover }),
 
     setMeterMode: (meterMode) => {
@@ -494,6 +571,7 @@ export const useSim = create<AppState>()((set, get) => {
         tstat.mode === 'cool' ? roomF > tstat.setpointF : tstat.mode === 'heat' ? roomF < tstat.setpointF : false;
       const changed = calling !== unit.controls.calling;
       set({ tstat });
+      remember(TSTAT_KEY, JSON.stringify(tstat));
       if (sim) set({ sim: resolve({ ...sim, controls: { ...sim.controls,
         calling: sim.heatPump ? calling : tstat.mode === 'cool' && calling, mode: tstat.mode } }) });
       else if (changed && furnace) set({ furnace: resolveFurnace({ ...furnace, controls: { ...furnace.controls, calling } }) });
@@ -576,6 +654,7 @@ export const useSim = create<AppState>()((set, get) => {
           const slot = leads.red === null ? 'red' : leads.black === null ? 'black' : nextLead;
           const placed = { ...leads, [slot]: id };
           set({ leads: placed, nextLead: slot === 'red' ? 'black' : 'red' });
+          playCue('leadPlaced');
           if (placed.red !== null && placed.black !== null) {
             set((s) => ({ measurements: s.measurements + 1 }));
             checkMeterSafety();
@@ -597,7 +676,27 @@ export const useSim = create<AppState>()((set, get) => {
       if (!needTool('clamp', 'Select the clamp meter to measure current on a wire.')) return;
       const same = get().clampAt === id;
       set((s) => ({ clampAt: same ? null : id, measurements: s.measurements + (same ? 0 : 1) }));
-      if (!same) { say(`Clamp meter around: ${clampLabel(id)}.`); recordEquipmentMeasurement(); }
+      if (!same) { playCue('clampOn'); say(`Clamp meter around: ${clampLabel(id)}.`); recordEquipmentMeasurement(); }
+    },
+
+    markWarn: (ids) => set((s) => ({
+      log: s.log.map((item) => (ids.includes(item.id) && (item.kind === 'info' || item.kind === 'sound') ? { ...item, kind: 'warn' } : item)),
+    })),
+
+    explainNoEffect: (label, toolName) => {
+      const hint = get().tool === 'hand' ? ' Pick a tool from the tool bag to work on it.' : ' Try another tool from the tool bag.';
+      say(`${label}: nothing to do here with the ${toolName.toLowerCase()}.${hint}`, 'warn');
+      playCue('toolMisuse');
+    },
+
+    rejectClamp: (name, why) => {
+      if (get().tool !== 'clamp') return;
+      const token = ++clampRejectToken;
+      set({ clampRejected: true });
+      playCue('clampReject');
+      const at = get().clampAt;
+      say(`Clamp: ${name} - ${why}${at ? ` Meter still reading: ${clampLabel(at)}.` : ''}`, 'warn');
+      setTimeout(() => { if (token === clampRejectToken) set({ clampRejected: false }); }, CLAMP_REJECT_MS);
     },
 
     clickPort: (side) => {
@@ -607,6 +706,7 @@ export const useSim = create<AppState>()((set, get) => {
         gauges: { ...s.gauges, [side]: on },
         measurements: s.measurements + (on ? 1 : 0),
       }));
+      if (on) playCue('hoseOn');
       const name = side === 'low' ? 'Blue hose on the suction port' : 'Red hose on the liquid port';
       say(on ? `${name}.` : `${name} removed.`);
     },
@@ -827,6 +927,7 @@ export const useSim = create<AppState>()((set, get) => {
         const result = await api.submit(sessionId, body);
         if (s.scenario) useTrainingProgress.getState().recordJob(s.scenario.id, sessionId, result, user);
         set({ busy: false, result, phase: 'graded' });
+        playCue(result.diagnosisCorrect ? 'jobPass' : 'jobFail');
       } catch (e) {
         set({ busy: false, error: e instanceof Error ? e.message : String(e) });
       }

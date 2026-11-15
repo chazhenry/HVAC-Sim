@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { type ComponentRef, type ReactNode, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { create } from 'zustand';
+import { HOLD_MS, HOLD_SLOP_PX, useIdentify } from '../store/useIdentify';
 import { useSim } from '../store/useSim';
 import { Condenser } from './Condenser';
 import { AirHandler } from './AirHandler';
@@ -59,6 +60,74 @@ function Controls(): ReactNode {
       zoomSpeed={0.9}
     />
   );
+}
+
+/**
+ * Press-and-hold to identify on touch screens (see useIdentify). A finger that rests still for
+ * HOLD_MS stops the orbit controls, and r3f's own hover handling names the part under it; sliding
+ * moves the label from part to part. A finger that moves first, or a second finger, orbits/zooms as usual.
+ */
+function TouchIdentify(): null {
+  const gl = useThree((s) => s.gl);
+  const get = useThree((s) => s.get);
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const fingers = new Set<number>();
+    let timer = 0;
+    let start: PointerEvent | null = null;
+    const controls = (): { enabled: boolean } | null => get().controls as unknown as { enabled: boolean } | null;
+    const finish = (): void => {
+      window.clearTimeout(timer);
+      start = null;
+      if (!useIdentify.getState().active) return;
+      const orbit = controls();
+      if (orbit) orbit.enabled = true;
+      useIdentify.getState().end();
+      useSim.getState().setHover(null);
+    };
+    const down = (event: PointerEvent): void => {
+      if (event.pointerType === 'mouse') return;
+      fingers.add(event.pointerId);
+      if (fingers.size > 1) { finish(); return; }
+      start = event;
+      timer = window.setTimeout(() => {
+        if (!start) return;
+        const orbit = controls();
+        if (orbit) orbit.enabled = false;
+        useIdentify.getState().begin(start.clientX, start.clientY);
+        // A still finger sends no pointermove, so ask r3f to hit-test where it rests.
+        get().events.handlers?.onPointerMove?.(start);
+      }, HOLD_MS);
+    };
+    const move = (event: PointerEvent): void => {
+      if (!start || event.pointerId !== start.pointerId) return;
+      if (useIdentify.getState().active) useIdentify.getState().move(event.clientX, event.clientY);
+      else if (Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY) > HOLD_SLOP_PX) {
+        window.clearTimeout(timer);
+        start = null;
+      }
+    };
+    const up = (event: PointerEvent): void => {
+      fingers.delete(event.pointerId);
+      if (fingers.size === 0) finish();
+    };
+    // Long-press on a touch screen must not open a context menu or select anything.
+    const menu = (event: Event): void => event.preventDefault();
+    canvas.addEventListener('pointerdown', down);
+    canvas.addEventListener('pointermove', move);
+    canvas.addEventListener('pointerup', up);
+    canvas.addEventListener('pointercancel', up);
+    canvas.addEventListener('contextmenu', menu);
+    return () => {
+      finish();
+      canvas.removeEventListener('pointerdown', down);
+      canvas.removeEventListener('pointermove', move);
+      canvas.removeEventListener('pointerup', up);
+      canvas.removeEventListener('pointercancel', up);
+      canvas.removeEventListener('contextmenu', menu);
+    };
+  }, [gl, get]);
+  return null;
 }
 
 function Outdoors(): ReactNode {
@@ -134,6 +203,7 @@ export function Scene(): ReactNode {
       />
       {unitType === 'furnace' ? <Basement /> : <Outdoors />}
       <Controls />
+      <TouchIdentify />
     </Canvas>
   );
 }

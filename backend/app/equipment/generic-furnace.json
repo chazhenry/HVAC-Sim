@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "id": "generic-furnace",
   "name": "Generic 80% gas furnace",
+  "slug": "Generic-furnace",
   "systemType": "gas_furnace",
   "unitType": "furnace",
   "outdoorModel": "Generic furnace",

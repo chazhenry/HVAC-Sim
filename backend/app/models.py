@@ -113,6 +113,8 @@ class EquipmentContext(ApiModel):
     schema_version: Literal[1] = 1
     id: str = Field(min_length=1, max_length=80, pattern=r"^[a-z0-9][a-z0-9_-]*$")
     name: str = Field(min_length=1, max_length=150)
+    # Short display label used in the visits log, e.g. "Generic-ac".
+    slug: str | None = Field(default=None, min_length=1, max_length=80)
     system_type: Literal["air_conditioner", "heat_pump", "gas_furnace"]
     unit_type: UnitType
     manufacturer: str = Field(default="Generic", max_length=80)

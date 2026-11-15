@@ -63,7 +63,7 @@ machine: it builds the frontend and copies it straight into `<HOMEPAGE_REPO>/pub
 The backend already uses SQLite. `POST /api/visits` records page visits in the same
 database as training sessions; no separate flat file or database service is needed.
 The main page requires email/password sign-in. Registration collects first/last name and confirms
-the password (12–128 characters with uppercase/lowercase, a number and a symbol). Only the email
+the password (8–24 characters with uppercase/lowercase, a number and a symbol). Only the email
 is saved in localStorage under `hvac-sim.email` and prefills the next login. Passwords and bearer
 sessions are not persisted in the browser. After authentication, the frontend sends one `home`
 visit; the server supplies the account email and `user_id`. React re-renders do not count as
@@ -74,8 +74,7 @@ records and add nullable `user_id` links to jobs, visits and feedback. Successfu
 counts as login 1. Sessions expire after 12 hours, are revoked on sign-out, and remain valid only
 in the current browser page. Serve frontend/API over HTTPS. Existing cross-origin deployment is
 supported with bearer headers, without third-party cookies; ensure `HVAC_SIM_CORS_ORIGINS` lists
-the homepage origin. Optional `HVAC_SIM_ALLOWED_EMAILS` in `backend/.env` restricts new accounts
-to a comma-separated invitation list. No Google credentials are needed.
+the homepage origin. Anyone can register an account. No Google credentials are needed.
 
 The `visits` table contains `id`, `visited_at` (UTC), `ip`, `city`, `state`, `country`,
 `app_version`, `event`, `user`, and `user_id`. Page loads use `home`; future activity can use other event

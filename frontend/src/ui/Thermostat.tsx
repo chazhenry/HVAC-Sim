@@ -184,7 +184,8 @@ const Face = ({ style, onStep, ...face }: FaceProps & { style: TstatStyle; onSte
 
 // ---------- settings ----------
 
-function ThermostatDialog({ onClose }: { onClose: () => void }): ReactNode {
+/** Full thermostat settings. `headingActions` sits beside the title, e.g. the layout pushpin. */
+export function ThermostatDialog({ onClose, headingActions }: { onClose: () => void; headingActions?: ReactNode }): ReactNode {
   const face = useFace();
   const style = useSim((s) => s.tstatStyle);
   const setStyle = useSim((s) => s.setTstatStyle);
@@ -202,8 +203,12 @@ function ThermostatDialog({ onClose }: { onClose: () => void }): ReactNode {
         : `Satisfied - not calling. The room is ${roomF.toFixed(0)} °F; set it ${mode === 'heat' ? 'above' : 'below'} that to make it call.`;
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="dialog tstat-dialog" role="dialog" aria-label="Thermostat settings" onClick={(e) => e.stopPropagation()}>
-        <h2>Thermostat</h2>
+      <div className="dialog tstat-dialog" role="dialog" aria-label="Thermostat settings" onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()}>
+        <div className="panel-heading">
+          <h2>Thermostat</h2>
+          {headingActions}
+        </div>
         <div className="tstat-big">
           <Face style={style} {...face} onStep={(delta) => set({ setpointF: setpointF + delta })} />
         </div>
@@ -284,7 +289,7 @@ export function ThermostatWidget(): ReactNode {
     'click to set',
   ].join(' · ');
   return (
-    <div className="tstat">
+    <div className="tstat" onContextMenu={(e) => e.preventDefault()}>
       <button type="button" className={`tstat-face ${style}`} title={details} aria-label={details} onClick={() => setDialog(true)}>
         <Face style={style} {...face} />
       </button>

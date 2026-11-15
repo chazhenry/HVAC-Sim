@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "id": "generic-ac",
   "name": "Generic residential A/C",
+  "slug": "Generic-ac",
   "systemType": "air_conditioner",
   "unitType": "condenser",
   "unit": {},

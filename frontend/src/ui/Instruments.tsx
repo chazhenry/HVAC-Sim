@@ -1,45 +1,12 @@
 import type { ReactNode } from 'react';
 import { liquidPsig, suctionPsig } from '../sim/engine';
 import { draftWc, inletWc, manifoldWc } from '../sim/furnace/engine';
-import type { MeterMode, MeterReading } from '../sim/instruments';
+import { formatReading, MODES } from './meterFormat';
 import { clampLabel, pointInfo } from '../sim/points';
 import { satTempF } from '../sim/refrigerant';
 import { inchesHg } from '../sim/service';
 import { ServiceCart } from './ServiceCart';
 import { activeClamp, activeHot, activeReading, type ManometerTap, useSim } from '../store/useSim';
-
-const MODES: ReadonlyArray<{ id: MeterMode; label: string; furnaceOnly?: boolean }> = [
-  { id: 'vac', label: 'V~' },
-  { id: 'ohm', label: 'Ω' },
-  { id: 'uf', label: 'µF' },
-  { id: 'ua', label: 'µA', furnaceOnly: true },
-];
-
-function formatReading(r: MeterReading): { main: string; unit: string; sub: string; alert: boolean } {
-  switch (r.kind) {
-    case 'idle':
-      return { main: '- - -', unit: '', sub: 'Place both leads', alert: false };
-    case 'ol':
-      return { main: 'OL', unit: 'Ω', sub: `Open circuit${r.note ? ` (${r.note})` : ''}`, alert: false };
-    case 'live':
-      return { main: 'LIVE', unit: '', sub: `${r.volts.toFixed(0)} V present - switch to volts!`, alert: true };
-    case 'na':
-      return { main: '- - -', unit: '', sub: r.note, alert: false };
-    case 'value': {
-      const v = r.value;
-      let main: string;
-      let unit: string = r.unit;
-      if (r.unit === 'V' || r.unit === 'µF') main = v.toFixed(1);
-      else if (r.unit === 'µA') main = v.toFixed(2);
-      else if (v >= 1000) {
-        main = (v / 1000).toFixed(2);
-        unit = 'kΩ';
-      } else main = v < 100 ? v.toFixed(2) : v.toFixed(1);
-      const beep = r.unit === 'Ω' && v < 30 ? 'continuity' : '';
-      return { main, unit, sub: [beep, r.note].filter(Boolean).join(' - '), alert: false };
-    }
-  }
-}
 
 function Multimeter(): ReactNode {
   // Re-render on every simulation tick so the reading stays live.
@@ -82,13 +49,16 @@ function ClampMeter(): ReactNode {
   useSim((s) => s.sim ?? s.furnace);
   const at = useSim((s) => s.clampAt);
   const amps = at ? activeClamp(useSim.getState(), at) : 0;
+  const rejected = useSim((s) => s.clampRejected);
   return (
     <div className="instrument meter">
       <header>
         <span>Clamp meter</span>
       </header>
       <div className="lcd">
-        <span className="lcd-main">{at ? amps.toFixed(amps < 1 ? 2 : 1) : '- - -'}</span>
+        <span className={`lcd-main${rejected ? ' lcd-reject' : ''}`} aria-label={rejected ? 'Not a useful wire to clamp' : undefined}>
+          {rejected ? '✕' : at ? amps.toFixed(amps < 1 ? 2 : 1) : '- - -'}
+        </span>
         <span className="lcd-unit">{at ? 'A' : ''}</span>
         <span className="lcd-sub">
           {at ? `${clampLabel(at)}${amps === 0 ? ' - no current flowing' : ''}` : 'Click a wire'}

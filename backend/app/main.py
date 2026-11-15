@@ -8,6 +8,7 @@ fault label), reveals hints, and grades the finished job against the answer key.
 from __future__ import annotations
 
 import os
+import uuid
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
@@ -123,7 +124,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
             return {"status": "excluded"}
         visit_id = str(body.visit_id)
         user = getattr(request.state, "auth_user", None)
-        if store.record_visit(visit_id, ip, body.app_version, body.event, user["email"] if user else body.user, user["id"] if user else None):
+        if store.record_visit(visit_id, ip, body.app_version, body.event, user["email"] if user else body.user, user["id"] if user else None, body.note or None):
             tasks.add_task(locate_visit, store, visit_id, ip)
         return {"status": "accepted"}
 
@@ -211,10 +212,17 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         return result
 
     @app.post("/api/sessions/{session_id}/chat", response_model=ChatResponse)
-    async def chat(session_id: str, body: ChatRequest, request: Request) -> ChatResponse:
+    async def chat(session_id: str, body: ChatRequest, request: Request, tasks: BackgroundTasks) -> ChatResponse:
         _, scenario = load(session_id, request)
         if (refusal := limiter.check(session_id)) is not None:
             raise HTTPException(status_code=429, detail=refusal)
+        ip = request.client.host if request.client else "unknown"
+        if ip not in VISITS_ADMIN_IPS:
+            # Log every prompt sent to the tutor as a 'chat' event, with the prompt as its note.
+            user = getattr(request.state, "auth_user", None)
+            visit_id = str(uuid.uuid4())
+            if store.record_visit(visit_id, ip, body.app_version, "chat", user["email"] if user else None, user["id"] if user else None, body.message):
+                tasks.add_task(locate_visit, store, visit_id, ip)
         try:
             config = store.get_context(session_id)
             equipment = EquipmentContext.model_validate_json(config) if config else None

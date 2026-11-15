@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "id": "goodman-gszb403610",
   "name": "Goodman GSZB4 · single-stage heat pump + AMST air handler",
+  "slug": "Goodman-gszb403610",
   "systemType": "heat_pump",
   "unitType": "condenser",
   "manufacturer": "Goodman",
@@ -18,12 +19,23 @@
   "dimensionsM": { "width": 0.9017, "depth": 0.9017, "height": 1.006475 },
   "cabinetColor": "#767a75",
   "unit": {
-    "capacitor": { "ratedHermUf": 40, "ratedFanUf": 5, "hermUf": 40, "fanUf": 5 },
+    "capacitor": {
+      "ratedHermUf": 40,
+      "ratedFanUf": 5,
+      "hermUf": 40,
+      "fanUf": 5
+    },
     "compressor": { "rla": 16, "lra": 91.9 },
     "fanMotor": { "fla": 0.97 }
   },
-  "heatPump": { "defrostIntervalMinutes": 60, "smartShiftSeconds": 30, "maxDefrostSeconds": 600,
-    "sensorCloseF": 31, "sensorOpenF": 75, "auxiliaryHeatKw": 5 },
+  "heatPump": {
+    "defrostIntervalMinutes": 60,
+    "smartShiftSeconds": 30,
+    "maxDefrostSeconds": 600,
+    "sensorCloseF": 31,
+    "sensorOpenF": 75,
+    "auxiliaryHeatKw": 5
+  },
   "sources": [
     "https://www.amgair.com/content/documents/goodman/SpecSheet-gszb4.pdf",
     "https://theacoutlet.com/cdn/shop/files/Repair-Parts-Goodman-GSZB4.pdf",

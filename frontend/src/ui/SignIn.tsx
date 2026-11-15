@@ -18,6 +18,15 @@ export function SignIn(): ReactNode {
   const [error, setError] = useState<string | null>(null);
   const requirements = passwordRequirements(password);
   const matches = password === confirmation;
+  // On sign-up, the typed characters turn green once valid and stay red until then.
+  const validity = (ok: boolean) => register ? (ok ? 'password-valid' : 'password-invalid') : undefined;
+  const eye = <button type="button" className="password-toggle" aria-label={show ? 'Hide passwords' : 'Show passwords'} title={show ? 'Hide passwords' : 'Show passwords'}
+    aria-pressed={show} disabled={busy} onClick={() => setShow((value) => !value)}>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" />
+      {show && <line x1="3" y1="3" x2="21" y2="21" />}
+    </svg>
+  </button>;
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
@@ -48,18 +57,18 @@ export function SignIn(): ReactNode {
       </div>}
       <label>Email<input type="email" name="email" autoComplete="username" autoFocus required maxLength={254} value={email} disabled={busy}
         onBlur={() => rememberEmail(email)} onChange={(event) => setEmail(event.target.value)} /></label>
-      <label>Password<input type={show ? 'text' : 'password'} name="password" autoComplete={register ? 'new-password' : 'current-password'} required
-        minLength={register ? 12 : 1} maxLength={128} value={password} disabled={busy} aria-describedby={register ? 'password-rules' : undefined}
-        onChange={(event) => setPassword(event.target.value)} /></label>
+      <label>Password<span className="password-field"><input className={validity(requirements.every((item) => item.met))} type={show ? 'text' : 'password'} name="password" autoComplete={register ? 'new-password' : 'current-password'}
+        // Signing in may leave it blank: the server accepts that only on localhost / the home network.
+        required={register} minLength={register ? 8 : undefined} maxLength={128} value={password} disabled={busy} aria-describedby={register ? 'password-rules' : undefined}
+        onChange={(event) => setPassword(event.target.value)} />{eye}</span></label>
       {register && <>
         <ul className="password-rules" id="password-rules">{requirements.filter((item) => item.display !== false).map((item) => <li key={item.label} className={item.met ? 'met' : ''}>
           <span aria-hidden="true">{item.met ? '✓' : '○'}</span> {item.label}
         </li>)}</ul>
-        <label>Confirm password<input type={show ? 'text' : 'password'} name="confirm-password" autoComplete="new-password" required maxLength={128}
-          value={confirmation} disabled={busy} aria-invalid={confirmation.length > 0 && !matches} onChange={(event) => setConfirmation(event.target.value)} /></label>
+        <label>Confirm password<span className="password-field"><input className={validity(confirmation.length > 0 && matches)} type={show ? 'text' : 'password'} name="confirm-password" autoComplete="new-password" required maxLength={128}
+          value={confirmation} disabled={busy} aria-invalid={confirmation.length > 0 && !matches} onChange={(event) => setConfirmation(event.target.value)} />{eye}</span></label>
         {confirmation && !matches && <p className="error" role="status">Passwords do not match.</p>}
       </>}
-      <button type="button" className="ghost auth-show-password" aria-pressed={show} onClick={() => setShow((value) => !value)}>{show ? 'Hide passwords' : 'Show passwords'}</button>
       {error && <p className="error" role="alert">{error}</p>}
       <button type="submit" className="primary" disabled={busy || register && (!requirements.every((item) => item.met) || !matches)}>
         {busy ? 'Please wait…' : register ? 'Create account and sign in' : 'Sign in'}

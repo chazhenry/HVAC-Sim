@@ -7,6 +7,16 @@ import { Exam } from './Exam';
 import { APP_VERSION } from '../version';
 import type { TrainingTrack } from '../training/catalog';
 import { AccountControls } from './AccountControls';
+import { logSignInChoice } from '../store/visitLog';
+import { tracks } from '../training/tracks';
+
+/** Equipment selected when the menu opens: the Goodman GSZB4 split system. */
+const DEFAULT_CONTEXT_ID = 'goodman-gszb403610';
+
+/** Notes the sign-in with the mode and equipment first chosen, e.g. "Residential troubleshooting / Generic-ac". */
+function logLogin(track: TrainingTrack, detail: string): void {
+  logSignInChoice(`${tracks.find((item) => item.id === track)?.title ?? track} / ${detail}`);
+}
 
 export function Menu(): ReactNode {
   const catalog = useSim((s) => s.catalog);
@@ -17,7 +27,7 @@ export function Menu(): ReactNode {
   const [exam, setExam] = useState<ExamSection | null>(null);
   const [chosen, setChosen] = useState<EquipmentContext | null>(null);
   const [track, setTrack] = useState<TrainingTrack>('residential');
-  const context = chosen ?? catalog?.contexts[0] ?? null;
+  const context = chosen ?? catalog?.contexts.find((item) => item.id === DEFAULT_CONTEXT_ID) ?? catalog?.contexts[0] ?? null;
   if (exam) return <Exam section={exam} onClose={() => setExam(null)} />;
   return (
     <div className="overlay">
@@ -38,7 +48,13 @@ export function Menu(): ReactNode {
         )}
         {!catalog && !error && <p>Loading service calls…</p>}
         {catalog && <TrainingMenu catalog={catalog} context={context} onContext={setChosen} busy={busy}
-          onStart={(id, equipment) => void start(id, equipment)} onExam={setExam} track={track} onTrackChange={setTrack} />}
+          onStart={(id, equipment) => {
+            const used = equipment ?? context;
+            const task = catalog.scenarios.find((scenario) => scenario.id === id)?.title ?? id;
+            logLogin(track, `${used ? used.slug ?? used.id : 'no equipment'} / ${task}`);
+            void start(id, equipment);
+          }}
+          onExam={(section) => { logLogin(track, `${section} exam`); setExam(section); }} track={track} onTrackChange={setTrack} />}
         <AccountControls />
       </div>
     </div>

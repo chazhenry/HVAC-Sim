@@ -58,6 +58,19 @@ last step has to happen there.
 `publish-frontend.sh` is the alternative for when the website repo is checked out on the same
 machine: it builds the frontend and copies it straight into `<HOMEPAGE_REPO>/public/hvac/`.
 
+## First Principles videos
+
+The videos in `docs/1stPrinciples` go out with the **backend** deploy, not the website: the app
+lists and streams them from the API, so they stay behind sign-in and never enter the website repo.
+
+- Drop video files (`.mp4`, `.m4v`, `.webm`, `.mov`, `.ogv`) into `docs/1stPrinciples`.
+- Run `bash deploy/deploy-backend.sh` (or `deploy-both.sh`). After the API is installed it copies
+  the folder to `/var/lib/<SERVICE_NAME>/videos` on the server, uploading only files that are new or
+  changed size, and removing files that were deleted locally. The service reads them from there
+  (`HVAC_SIM_VIDEOS_DIR` in `hvac-sim.service`); no restart is needed when only videos change.
+- The videos are git-ignored (only that folder's README is committed), so `deploy-frontend.sh`
+  never pushes them to GitHub.
+
 ## Simulator page visits
 
 The backend already uses SQLite. `POST /api/visits` records page visits in the same
@@ -123,7 +136,7 @@ Only things it owns (shown for the default `SERVICE_NAME=hvac-sim`; another name
 and the user to match):
 
 - `/opt/hvac-sim` - code (`current`, `previous`) and a private Python venv
-- `/var/lib/hvac-sim` - the SQLite session and visit database
+- `/var/lib/hvac-sim` - the SQLite session and visit database, and `videos/` (the First Principles videos)
 - `/etc/systemd/system/hvac-sim.service` - runs as system user `hvac-sim`,
   listening on `127.0.0.1:<APP_PORT>` only
 - `/etc/nginx/sites-available/hvac-sim` - a separate nginx site for `API_DOMAIN`

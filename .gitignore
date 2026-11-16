@@ -44,3 +44,7 @@ desktop.ini
 
 # Claude Code: keep shared project config, ignore personal settings
 .claude/settings.local.json
+
+# First Principles videos: large, shipped to the API server by deploy/deploy-backend.sh, not via git
+docs/1stPrinciples/*
+!docs/1stPrinciples/README.md

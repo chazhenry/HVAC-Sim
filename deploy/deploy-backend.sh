@@ -59,6 +59,53 @@ echo "  installing"
 ssh "${SSH_OPTS[@]}" "$TARGET" \
     "sudo bash /tmp/hvac-sim-install.sh '$APP_PORT' '$API_DOMAIN' '$SITE_ORIGINS' /tmp/hvac-sim-bundle.tgz '$SERVICE_NAME' '$REMOTE_ENV'; rc=\$?; rm -f /tmp/hvac-sim-install.sh; exit \$rc"
 
+# First Principles videos: mirror docs/1stPrinciples into /var/lib/<name>/videos, outside the release
+# folders so they survive each deploy. Only new or changed files (by name and size) are uploaded;
+# videos removed locally are removed from the server.
+VIDEO_SRC="docs/1stPrinciples"
+VIDEO_DEST="/var/lib/${SERVICE_NAME}/videos"
+if [ -d "$VIDEO_SRC" ]; then
+    echo "  syncing videos -> ${VIDEO_DEST}"
+    REMOTE_LIST="$(ssh "${SSH_OPTS[@]}" "$TARGET" \
+        "sudo mkdir -p '$VIDEO_DEST' && sudo chmod 755 '$VIDEO_DEST' && sudo find '$VIDEO_DEST' -maxdepth 1 -type f -printf '%s %f\n'")"
+    declare -A LOCAL_SIZE=()
+    uploaded=0
+    for path in "$VIDEO_SRC"/*; do
+        [ -f "$path" ] || continue
+        name="$(basename "$path")"
+        case "$name" in
+            .*|*\'*) echo "    skipped (unsupported name): $name"; continue ;;
+        esac
+        # Only the video types the API serves (backend/app/videos.py); README etc. stay local.
+        case "${name,,}" in
+            *.mp4|*.m4v|*.webm|*.mov|*.ogv) ;;
+            *) continue ;;
+        esac
+        size="$(wc -c < "$path" | tr -d ' ')"
+        LOCAL_SIZE["$name"]="$size"
+        if ! grep -qxF "$size $name" <<< "$REMOTE_LIST"; then
+            echo "    uploading $name ($((size / 1000000)) MB)"
+            scp -q "${SSH_OPTS[@]}" "$path" "${TARGET}:/tmp/hvac-sim-video.$$"
+            ssh "${SSH_OPTS[@]}" "$TARGET" \
+                "sudo install -m 644 -o root -g '$SERVICE_NAME' /tmp/hvac-sim-video.$$ '$VIDEO_DEST/$name'; rc=\$?; rm -f /tmp/hvac-sim-video.$$; exit \$rc"
+            uploaded=$((uploaded + 1))
+        fi
+    done
+    removed=0
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        name="${line#* }"
+        if [ -z "${LOCAL_SIZE[$name]+set}" ] && [[ "$name" != *\'* ]]; then
+            echo "    removing $name (no longer in $VIDEO_SRC)"
+            ssh "${SSH_OPTS[@]}" "$TARGET" "sudo rm -f '$VIDEO_DEST/$name'"
+            removed=$((removed + 1))
+        fi
+    done <<< "$REMOTE_LIST"
+    echo "  videos: ${#LOCAL_SIZE[@]} in $VIDEO_SRC, $uploaded uploaded, $removed removed"
+else
+    echo "  no $VIDEO_SRC folder - First Principles videos not synced"
+fi
+
 echo ""
 echo "Backend deployed. Checking https://${API_DOMAIN}/api/health ..."
 if curl -fsS --max-time 10 "https://${API_DOMAIN}/api/health" >/dev/null 2>&1; then

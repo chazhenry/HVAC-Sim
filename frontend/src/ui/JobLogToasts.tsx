@@ -3,20 +3,23 @@ import { activeClick } from '../store/clickScope';
 import { type LogEntry, type LogKind, useSim } from '../store/useSim';
 import { savedScale } from './meterScale';
 import { meterSizeFor } from './toolIcons';
-import { clickToastLeft, JOB_LOG_TOAST_CLOSED } from './toastPlacement';
+import { iconBox, JOB_LOG_TOAST_CLOSED, toastBesideIcon } from './toastPlacement';
+
+/** The plain tool cursor: a 32 px arrow-and-icon image whose tip (the hot spot) is at 2, 2. */
+const ARROW_CURSOR = { width: 32, height: 32, hotX: 2, hotY: 2 } as const;
 
 const CLOSE_MS = 280;
 const EDGE = 8;
 const SEVERITY: Record<LogKind, number> = { info: 0, sound: 0, good: 1, warn: 2, danger: 3 };
 
-/** Messages produced by one click on a 3D object: shown at once, centred where the user clicked. */
+/** Messages produced by one click on a 3D object: shown at once, beside the tool icon where the user clicked. */
 interface ClickToast { key: number; x: number; y: number; ids: number[] }
 
 const readingTime = (text: string): number => Math.max(3500, Math.min(8000, text.length * 45));
 
 /**
  * Toasts for job-log messages. Ordinary messages queue in the corner one at a time. Messages caused by a
- * click on the 3D view (see clickScope) skip the queue and appear on the click point, so a tool error
+ * click on the 3D view (see clickScope) skip the queue and appear beside the tool icon, so a tool error
  * shows right where the user was working.
  */
 export function JobLogToasts(): ReactNode {
@@ -82,7 +85,7 @@ export function JobLogToasts(): ReactNode {
     return () => window.clearTimeout(timer);
   }, [click, clickText]);
 
-  // Place the click toast at the click (beside the meter, if one is drawn there), kept inside the window.
+  // Place the click toast beside the tool icon at the click, on the side of the 3D view with more room.
   useLayoutEffect(() => {
     const element = clickToast.current;
     if (!element || !click) return;
@@ -90,11 +93,19 @@ export function JobLogToasts(): ReactNode {
     const width = element.offsetWidth;
     const height = element.offsetHeight;
     const { tool } = useSim.getState();
+    // On touch there is no cursor (the meter sits in a corner): go beside the finger instead.
+    const touch = window.matchMedia('(pointer: coarse)').matches;
     const meter = meterSizeFor(tool);
-    const underMouse = meter && !window.matchMedia('(pointer: coarse)').matches;
-    const half = underMouse ? (meter.width / 2) * savedScale(tool) : null;
-    const left = Math.min(Math.max(EDGE, clickToastLeft(click.x, width, window.innerWidth, half)), window.innerWidth - width - EDGE);
-    const top = Math.min(Math.max(EDGE, click.y - height / 2), window.innerHeight - height - EDGE);
+    const icon = touch
+      ? iconBox(click.x, click.y, { width: 0, height: 0, hotX: 0, hotY: 0 })
+      : meter ? iconBox(click.x, click.y, meter, savedScale(tool)) : iconBox(click.x, click.y, ARROW_CURSOR);
+    const view = document.querySelector('.viewport')?.getBoundingClientRect();
+    const area = view
+      ? { left: view.left + EDGE, top: view.top + EDGE, right: view.right - EDGE, bottom: view.bottom - EDGE }
+      : { left: EDGE, top: EDGE, right: window.innerWidth - EDGE, bottom: window.innerHeight - EDGE };
+    const placed = toastBesideIcon(icon, width, height, area);
+    const left = Math.min(Math.max(EDGE, placed.left), window.innerWidth - width - EDGE);
+    const top = Math.min(Math.max(EDGE, placed.top), window.innerHeight - height - EDGE);
     element.style.left = `${Math.round(left)}px`;
     element.style.top = `${Math.round(top)}px`;
   }, [click, clickText]);

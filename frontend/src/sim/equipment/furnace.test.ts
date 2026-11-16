@@ -105,7 +105,11 @@ describe('complete furnace jobs through store, instruments, physics and procedur
       if (id === 'f-igniter') meter('ohm', 'F_IGN_H', 'F_IGN_N');
       if (id === 'f-inducer') meter('ohm', 'F_IND_H', 'F_IND_N');
       if (id === 'f-gas-valve') { meter('ohm', 'F_GV_MV', 'F_GV_C'); click('gasCock'); }
-      if (id === 'f-blower-cap') { click('blowerCap', 'discharge'); meter('uf', 'F_BCAP_A', 'F_BCAP_B'); }
+      if (id === 'f-blower-cap') {
+        // Black clip on one terminal, red on the other bleeds the blower capacitor.
+        job().setTool('discharge'); job().probe('F_BCAP_A'); job().probe('F_BCAP_B');
+        meter('uf', 'F_BCAP_A', 'F_BCAP_B');
+      }
       click(...repair);
       if (id === 'f-gas-valve') click('gasCock');
       click('blowerDoor'); click('burnerDoor'); click('serviceSwitch');

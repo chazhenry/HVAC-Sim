@@ -5,6 +5,8 @@ import type { FurnaceState } from '../furnace/engine';
 export type ToolId =
   | 'hand'
   | 'speak'
+  /** Not held: opens the First Principles video list. */
+  | 'firstprinciples'
   | 'nutdriver'
   | 'multimeter'
   | 'clamp'

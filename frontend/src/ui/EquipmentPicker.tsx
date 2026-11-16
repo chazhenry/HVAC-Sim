@@ -88,11 +88,11 @@ export function EquipmentPicker({
               <div className="sheet-scrim clear" onClick={() => setMenu(false)} />
               <div className="popover align-right equipment-menu" role="menu">
                 <button type="button" role="menuitem" onClick={() => { setMenu(false); downloadContext(selected); }}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></svg>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 4h11l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z" /><path d="M8 4v5h7V4" /><rect x="8" y="13" width="8" height="5" rx="0.5" /></svg>
                   Save configuration JSON
                 </button>
                 <button type="button" role="menuitem" onClick={() => { setMenu(false); input.current?.click(); }}>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20V9" /><path d="m7 14 5-5 5 5" /><path d="M5 4h14" /></svg>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" /></svg>
                   Load configuration JSON…
                 </button>
                 <button type="button" role="menuitem" onClick={() => { setMenu(false); setEditing(true); }}>

@@ -8,6 +8,7 @@ import type { ToolId } from '../store/useSim';
 export const TOOL_NAMES: Partial<Record<ToolId, string>> = {
   hand: 'Hand',
   speak: 'Speak tool',
+  firstprinciples: 'First Principles videos',
   nutdriver: 'Nut driver',
   multimeter: 'Multimeter',
   clamp: 'Clamp meter',

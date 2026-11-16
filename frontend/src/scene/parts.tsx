@@ -353,7 +353,8 @@ export function TestPoint({ id }: { id: AnyTestPointId }): ReactNode {
   const def = pointInfo(id);
   const { pos, normal } = placementOf(id);
   const open = useSim((s) => s.isAccessible(def.enclosure));
-  const probing = useSim((s) => s.tool === 'multimeter' || s.tool === 'ncv');
+  const probing = useSim((s) => s.tool === 'multimeter' || s.tool === 'ncv' || (s.tool === 'discharge' && def.onCapacitor));
+  const clip = useSim((s) => (s.dischargeClips.black === id ? 'black' : s.dischargeClips.red === id ? 'red' : null));
   const lead = useSim((s) => (s.leads.red === id ? 'red' : s.leads.black === id ? 'black' : null));
   const ncvHere = useSim((s) => s.ncvAt === id);
   const hot = useSim((s) => s.ncvAt === id && activeHot(s, id));
@@ -393,6 +394,22 @@ export function TestPoint({ id }: { id: AnyTestPointId }): ReactNode {
           </mesh>
         </group>
       )}
+      {clip && (
+        <group
+          rotation={rotation}
+          {...interactive(`${clip === 'red' ? 'Red' : 'Black'} discharge clip on: ${def.label}`, () => useSim.getState().probe(id))}
+        >
+          {/* Alligator jaws on the terminal, then the insulating sleeve. */}
+          <mesh position={[0, 0.016, 0]}>
+            <boxGeometry args={[0.012, 0.03, 0.006]} />
+            <meshStandardMaterial color={clip === 'red' ? '#d32f2f' : '#151515'} roughness={0.45} />
+          </mesh>
+          <mesh position={[0, 0.05, 0]}>
+            <cylinderGeometry args={[0.0055, 0.0055, 0.04, 10]} />
+            <meshStandardMaterial color={clip === 'red' ? '#b71c1c' : '#0b0b0b'} roughness={0.6} />
+          </mesh>
+        </group>
+      )}
       {ncvHere && (
         <group
           position={out(0.012)}
@@ -415,6 +432,62 @@ export function TestPoint({ id }: { id: AnyTestPointId }): ReactNode {
           {def.short}
         </Html>
       )}
+    </group>
+  );
+}
+
+const LED_OFF = new THREE.Color('#ffffff');
+const LED_ON = new THREE.Color('#ff2a1a');
+/** Seconds for the LED to go from fully lit to out. */
+const LED_FADE_SECONDS = 2.4;
+
+/**
+ * Charge indicator LED set into a run capacitor's body: red while charged (dimmer once one section of a
+ * dual capacitor is bled), out - plain white plastic - once drained. `charge` runs from 1 to 0. Unlit colours, so the scene's
+ * lighting can never tint the white towards pink: the LED is either red or white, never a blend.
+ */
+export function CapChargeLed({ position, radius, charge, facing }: {
+  position: Vec3;
+  radius: number;
+  charge: number;
+  /** Rotation about the vertical axis that points the LED out of the capacitor's surface (0 = +Z). */
+  facing: number;
+}): ReactNode {
+  const material = useRef<THREE.MeshBasicMaterial>(null);
+  const shown = useRef(charge);
+  useFrame(({ clock }, delta) => {
+    const step = delta / LED_FADE_SECONDS;
+    const level = shown.current;
+    shown.current = level > charge ? Math.max(charge, level - step) : Math.min(charge, level + step);
+    const m = material.current;
+    if (!m) return;
+    // Flashes (about 6 times a second) while the charge is bleeding off; steady otherwise.
+    const draining = level > charge + 0.001;
+    const lit = draining ? (Math.sin(clock.elapsedTime * Math.PI * 12) > 0 ? shown.current : 0) : shown.current;
+    // Red, dimmer at partial charge; white once (practically) empty.
+    if (lit > 0.02) m.color.copy(LED_ON).multiplyScalar(0.5 + 0.5 * lit);
+    else m.color.copy(LED_OFF);
+  });
+  return (
+    <group position={position} rotation={[0, facing, 0]}>
+      <mesh raycast={() => undefined}>
+        <sphereGeometry args={[radius, 16, 12]} />
+        <meshBasicMaterial ref={material} color={LED_OFF} toneMapped={false} />
+      </mesh>
+      {/* Dark bezel ring the lens sits in, and a recess shadow behind it, for depth */}
+      <mesh position={[0, 0, -radius * 0.15]} raycast={() => undefined}>
+        <torusGeometry args={[radius * 1.12, radius * 0.38, 10, 24]} />
+        <meshStandardMaterial color="#2b2e33" metalness={0.3} roughness={0.45} />
+      </mesh>
+      <mesh position={[0, -radius * 0.25, -radius * 0.55]} raycast={() => undefined}>
+        <circleGeometry args={[radius * 1.75, 24]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.28} depthWrite={false} />
+      </mesh>
+      {/* Specular glint on the lens */}
+      <mesh position={[-radius * 0.38, radius * 0.4, radius * 0.82]} raycast={() => undefined}>
+        <sphereGeometry args={[radius * 0.22, 8, 6]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.85} toneMapped={false} />
+      </mesh>
     </group>
   );
 }

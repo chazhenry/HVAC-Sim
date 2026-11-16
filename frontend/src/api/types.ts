@@ -320,3 +320,11 @@ export interface VisitsPage {
   offset: number;
   limit: number;
 }
+
+/** A First Principles video: its file name, display title, size and a short-lived signed link (an API path). */
+export interface VideoInfo {
+  name: string;
+  title: string;
+  sizeBytes: number;
+  url: string;
+}

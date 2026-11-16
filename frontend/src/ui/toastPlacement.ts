@@ -2,16 +2,31 @@
 
 export const JOB_LOG_TOAST_CLOSED = 'hvac:job-log-toast-closed';
 
-/** Space between a meter drawn under the mouse and a toast placed beside it. */
+/** Space between the tool icon under the mouse and a toast placed beside it. */
 const BESIDE_GAP = 14;
 
+/** A screen rectangle in px. */
+export interface Box { left: number; top: number; right: number; bottom: number }
+
+/** Where the tool icon is drawn for a click at (x, y): the icon's size and its hot spot, at the given scale. */
+export function iconBox(x: number, y: number, icon: { width: number; height: number; hotX: number; hotY: number }, scale = 1): Box {
+  return {
+    left: x - icon.hotX * scale,
+    top: y - icon.hotY * scale,
+    right: x + (icon.width - icon.hotX) * scale,
+    bottom: y + (icon.height - icon.hotY) * scale,
+  };
+}
+
 /**
- * Where a click toast goes: beside the meter under the mouse (clamp meter or multimeter), on the side
- * with more room, so the meter never covers it; otherwise centred on the click.
+ * Where a click toast goes: beside the tool icon, on whichever side has more width left in the 3D view,
+ * vertically centred on the icon and kept inside the view.
  */
-export function clickToastLeft(x: number, width: number, viewportWidth: number, meterHalfWidth: number | null): number {
-  const centred = x - width / 2;
-  if (meterHalfWidth === null) return centred;
-  const roomRight = viewportWidth - x;
-  return roomRight >= x ? x + meterHalfWidth + BESIDE_GAP : x - meterHalfWidth - BESIDE_GAP - width;
+export function toastBesideIcon(icon: Box, width: number, height: number, area: Box): { left: number; top: number } {
+  const roomRight = area.right - icon.right;
+  const roomLeft = icon.left - area.left;
+  const left = roomRight >= roomLeft ? icon.right + BESIDE_GAP : icon.left - BESIDE_GAP - width;
+  const centre = (icon.top + icon.bottom) / 2 - height / 2;
+  const top = Math.min(Math.max(area.top, centre), area.bottom - height);
+  return { left, top };
 }

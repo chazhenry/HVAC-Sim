@@ -2317,3 +2317,21 @@ kbd { font: 11px/1.4 Consolas, monospace; padding: 0 4px; color: var(--muted); b
 .equipment-gear-anchor { position: absolute; top: 14px; right: 14px; z-index: 2; }
 .menu-heading { padding-right: 44px; }
 .equipment-menu > button svg { flex: none; color: var(--muted); }
+
+/* First Principles video library (ui/FirstPrinciples.tsx): the list and the modal player. */
+.video-menu, .video-player { margin: auto; color: var(--text); }
+.video-menu::backdrop, .video-player::backdrop { background: rgba(8, 11, 15, 0.78); }
+.video-menu { width: min(520px, calc(100vw - 32px)); }
+.video-player { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+.video-menu-heading { display: flex; align-items: center; gap: 10px; }
+.video-menu-heading h2 { margin: 0; flex: 1; font-size: 1.15rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.video-list button {
+  width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;
+  padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text);
+}
+.video-list button:hover, .video-list button:focus-visible { border-color: var(--accent, #5aa2f0); background: rgba(90, 162, 240, 0.1); }
+.video-list-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 8px; flex: none; color: #5aa2f0; background: rgba(90, 162, 240, 0.14); }
+.video-list-title { flex: 1; font-weight: 600; min-width: 0; }
+.video-list-size { color: var(--muted); font-size: 12px; flex: none; }
+.video-player video { width: 100%; max-height: calc(100vh - 140px); background: #000; border-radius: 8px; display: block; }

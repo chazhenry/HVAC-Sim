@@ -16,6 +16,7 @@ import type {
   VisitsPage,
 } from './types';
 import { useAuth } from '../store/useAuth';
+import type { VideoInfo } from './types';
 import { APP_VERSION } from '../version';
 
 export class ApiError extends Error {
@@ -33,6 +34,9 @@ export class ApiError extends Error {
  * production build can point at another host with VITE_API_BASE.
  */
 const API_BASE = (import.meta.env.VITE_API_BASE ?? '/api').replace(/\/+$/, '');
+
+/** Full address of an API path such as a video's signed link. */
+export const apiUrl = (path: string): string => `${API_BASE}${path}`;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
@@ -84,6 +88,7 @@ export const api = {
   hint: (sessionId: string) => request<HintResponse>(`/sessions/${sessionId}/hint`, post()),
   chat: (sessionId: string, body: ChatRequest) =>
     request<ChatResponse>(`/sessions/${sessionId}/chat`, post({ ...body, appVersion: APP_VERSION })),
+  videos: () => request<VideoInfo[]>('/videos'),
   examSections: () => request<ExamSectionInfo[]>('/exam'),
   examPaper: (section: ExamSection) => request<ExamPaper>(`/exam/${section}`),
   gradeExam: (section: ExamSection, answers: Record<string, number>) =>

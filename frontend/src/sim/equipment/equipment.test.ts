@@ -70,11 +70,13 @@ describe('procedure evidence from actual store actions', () => {
   });
   const act = () => useSim.getState();
   function checks(): void {
+    act().clickDoor(); // the pull-out is behind the cover
     act().clickPullout();
     useSim.setState({ tool: 'multimeter' });
     act().probe('CAP_HERM'); act().probe('CAP_C');
     useSim.setState({ tool: 'discharge' });
-    act().clickPart('capacitor');
+    // Black on Common, then red across each section: compressor (HERM), then fan.
+    act().probe('CAP_C'); act().probe('CAP_HERM'); act().probe('CAP_FAN');
     act().setMeterMode('uf');
     useSim.setState({ tool: 'part_capacitor' });
     act().clickPart('capacitor');
@@ -96,5 +98,44 @@ describe('procedure evidence from actual store actions', () => {
       { type: 'component.replaced', componentId: cap, safe: true, t: 0 },
     ];
     expect(procedureProgress(procedure, [...events, ...restart], true).has('replace')).toBe(false);
+  });
+});
+
+describe('disconnect cover', () => {
+  it('blocks pulling or inserting the disconnect until the cover is open', () => {
+    const closed = { ...actionState(), doorOpen: false };
+    const blocked = applyEquipmentAction(closed, { type: 'disconnect.toggle' });
+    expect(blocked.sim.controls.disconnectIn).toBe(closed.sim.controls.disconnectIn);
+    expect(blocked.events).toEqual([]);
+    expect(blocked.messages[0]).toMatchObject({ kind: 'warn', text: expect.stringMatching(/Open the disconnect cover first/) });
+    const open = applyEquipmentAction(actionState(), { type: 'disconnect.toggle' });
+    expect(open.sim.controls.disconnectIn).toBe(!closed.sim.controls.disconnectIn);
+  });
+});
+
+describe('two-clip capacitor discharge', () => {
+  beforeEach(() => useSim.setState({ ...useSim.getInitialState(), unitType: 'condenser', phase: 'running', sim: sim(),
+    panels: { access: false, top: true, louver: true }, doorOpen: true }));
+  const act = () => useSim.getState();
+
+  it('needs black on Common first, then red on each section; only then is the capacitor discharged', () => {
+    // Cover already open (beforeEach): pull the disconnect so the capacitor terminals are dead.
+    if (act().sim!.controls.disconnectIn) act().clickPullout();
+    expect(act().sim!.controls.disconnectIn).toBe(false);
+    useSim.setState({ tool: 'discharge', sim: { ...act().sim!, capCharged: true } });
+    // Red-first or a non-Common terminal is refused; the body is refused.
+    act().probe('CAP_HERM');
+    expect(act().dischargeClips.black).toBeNull();
+    act().clickPart('capacitor');
+    expect(act().sim!.capCharged).toBe(true);
+    act().probe('CAP_C');
+    expect(act().dischargeClips.black).toBe('CAP_C');
+    act().probe('CAP_HERM');
+    expect(act().bledSections).toEqual({ herm: true, fan: false });
+    expect(act().sim!.capCharged).toBe(true);
+    act().probe('CAP_FAN');
+    expect(act().sim!.capCharged).toBe(false);
+    expect(act().dischargeClips).toEqual({ black: null, red: null });
+    expect(act().equipmentJournal.events.at(-1)?.type).toBe('capacitor.discharged');
   });
 });

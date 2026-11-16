@@ -12,6 +12,7 @@ const THERMOMETER =
   '<path d="M12 3a2 2 0 0 0-2 2v9.2a4 4 0 1 0 4 0V5a2 2 0 0 0-2-2z"/><circle cx="12" cy="17.5" r="1.6" fill="FILL"/><path d="M12 16V8"/>';
 
 const ICONS: Record<ToolId, string> = {
+  firstprinciples: '<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 0 2 2h13v-4"/><path d="M8.5 7.5h6.5M8.5 10.5h4.5"/>',
   speak: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/>',
   hand: '<path d="M9 12V5.5a1.5 1.5 0 0 1 3 0V11l5 1a2 2 0 0 1 1.6 2v2.5a5 5 0 0 1-5 5h-1.8a5 5 0 0 1-4.3-2.5L5 14.6a1.4 1.4 0 0 1 2.2-1.7L9 14.6"/>',
   nutdriver:
@@ -298,7 +299,8 @@ export function testerImage(face: TesterFace): string {
   const key = JSON.stringify(face);
   const cached = testerCache.get(key);
   if (cached) return cached;
-  const glow = face.hot === null ? '#9aa3ab' : face.hot ? '#ff3b30' : '#34c759';
+  // A real tester's tip only lights for voltage; with none it stays dark.
+  const glow = face.hot === null ? '#9aa3ab' : face.hot ? '#ff3b30' : '#1a1c1f';
   const status = face.hot === null ? 'TAP A TERMINAL' : face.hot ? 'HOT' : 'NO VOLTAGE';
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="128" viewBox="0 0 64 128">` +
@@ -317,7 +319,7 @@ export function testerImage(face: TesterFace): string {
     `<circle cx="32" cy="83" r="3" fill="${face.hot === null ? '#3a3f45' : glow}" stroke="#10141a" stroke-width="0.8"/>` +
     // Result tag.
     `<rect x="3" y="96" width="58" height="29" rx="4" fill="#cdd3c4" stroke="#10141a" stroke-width="0.8"/>` +
-    `<text x="32" y="108" font-family="Arial,Helvetica,sans-serif" font-size="${face.hot ? 9 : face.hot === false ? 6.4 : 5.2}" font-weight="800" fill="${face.hot ? '#c62828' : face.hot === false ? '#1b7a3a' : '#1c1f1a'}" text-anchor="middle">${status}</text>` +
+    `<text x="32" y="108" font-family="Arial,Helvetica,sans-serif" font-size="${face.hot ? 9 : face.hot === false ? 6.4 : 5.2}" font-weight="800" fill="${face.hot ? '#c62828' : '#1c1f1a'}" text-anchor="middle">${status}</text>` +
     lcdCaption(face.point, 32, 119.5, 52) +
     `</svg>`;
   const url = `data:image/svg+xml,${encodeURIComponent(svg)}`;
@@ -387,6 +389,74 @@ export function meterSizeFor(tool: string): { width: number; height: number; hot
     case 'multimeter': return MULTIMETER_SIZE;
     case 'ncv': return TESTER_SIZE;
     case 'tempclamp': return TEMP_CLAMP_SIZE;
+    case 'discharge': return DISCHARGE_SIZE;
+    case 'nutdriver': return NUTDRIVER_SIZE;
     default: return null;
   }
+}
+
+// ---------- capacitor discharge tool ----------
+
+/** On-screen size and hot spot (the clip's jaws, centred) of the 64 × 120 drawing, shown at 3/4 size. */
+export const DISCHARGE_SIZE = { width: 48, height: 90, hotX: 24, hotY: 2.25 } as const;
+
+/** One alligator clip on its lead: jaws at the top (tip at x, top), ribbed boot, then the cord down to a post. */
+function alligator(x: number, top: number, color: string, edge: string, postX: number): string {
+  return (
+    // Cord from the boot down to its post on the box.
+    `<path d="M${x} ${top + 52}C${x} ${top + 66} ${postX} ${top + 64} ${postX} ${top + 76}" fill="none" stroke="${color}" stroke-width="2.6"/>` +
+    // Jaws: two tapered halves meeting at the tip, with teeth.
+    `<path d="M${x - 1.5} ${top}L${x - 6} ${top + 16}h12L${x + 1.5} ${top}z" fill="${color}" stroke="${edge}" stroke-width="0.9"/>` +
+    `<path d="M${x} ${top + 2}v12" stroke="${edge}" stroke-width="0.8" stroke-dasharray="1 1.4"/>` +
+    // Insulating sleeve with a lip, then the ribbed boot.
+    `<path d="M${x - 6} ${top + 16}h12l-1.5 14h-9z" fill="${color}" stroke="${edge}" stroke-width="0.9"/>` +
+    `<rect x="${x - 3.5}" y="${top + 30}" width="7" height="22" rx="2" fill="${color}" stroke="${edge}" stroke-width="0.9"/>` +
+    [0, 1, 2, 3, 4].map((i) => `<path d="M${x - 3.5} ${top + 34 + i * 3.6}h7" stroke="${edge}" stroke-width="0.9"/>`).join('')
+  );
+}
+
+/**
+ * Capacitor discharge tool: an orange resistor box showing only the clip that goes on next (black first,
+ * then red), its jaw tip centred at the top as the click point. The other lead's post is left bare.
+ */
+export function dischargeImage(next: 'black' | 'red' = 'black'): string {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="120" viewBox="0 0 64 120">` +
+    (next === 'red' ? alligator(32, 1, '#d32f2f', '#7f1010', 22) : alligator(32, 1, '#1d1d1f', '#000', 42)) +
+    // Binding posts.
+    `<ellipse cx="22" cy="80" rx="5" ry="2" fill="#a51d1d" stroke="#5c0d0d" stroke-width="0.8"/>` +
+    `<ellipse cx="42" cy="80" rx="5" ry="2" fill="#1d1d1f" stroke="#000" stroke-width="0.8"/>` +
+    // Orange box with a lighter top face.
+    `<path d="M6 84q0-4 4-4h44q4 0 4 4v30q0 4-4 4H10q-4 0-4-4z" fill="#f28c1c" stroke="#7a3d00" stroke-width="1"/>` +
+    `<path d="M9 82h46" stroke="#ffb35a" stroke-width="2" stroke-linecap="round"/>` +
+    `<path d="M8 112h48" stroke="#c96a08" stroke-width="2" stroke-linecap="round" opacity="0.6"/>` +
+    `</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+// ---------- nut driver ----------
+
+/** On-screen size and hot spot (the socket opening) of the 24 × 128 drawing, shown at 3/4 size. */
+export const NUTDRIVER_SIZE = { width: 18, height: 96, hotX: 9, hotY: 1.5 } as const;
+
+/** Nut driver: hex socket and steel shaft, a clear yellow bolster and a black cushion-grip handle. */
+export function nutdriverImage(): string {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="128" viewBox="0 0 24 128">` +
+    `<defs><linearGradient id="steel" x1="0" x2="1"><stop offset="0" stop-color="#8d949b"/><stop offset="0.45" stop-color="#f2f4f6"/><stop offset="1" stop-color="#7c838a"/></linearGradient>` +
+    `<linearGradient id="amber" x1="0" x2="1"><stop offset="0" stop-color="#c9a100"/><stop offset="0.5" stop-color="#ffe86b"/><stop offset="1" stop-color="#b58f00"/></linearGradient>` +
+    `<linearGradient id="grip" x1="0" x2="1"><stop offset="0" stop-color="#0d0e10"/><stop offset="0.5" stop-color="#33363b"/><stop offset="1" stop-color="#0d0e10"/></linearGradient></defs>` +
+    // Socket (slightly wider) with its hex opening at the top: the hot spot.
+    `<rect x="7" y="1" width="10" height="13" rx="1" fill="url(#steel)" stroke="#4c5258" stroke-width="0.8"/>` +
+    `<path d="M9.5 2h5l1.3 2.2-1.3 2.2h-5L8.2 4.2z" fill="#2a2d31"/>` +
+    // Shaft.
+    `<rect x="8.5" y="13" width="7" height="40" fill="url(#steel)" stroke="#4c5258" stroke-width="0.7"/>` +
+    // Clear yellow bolster with fluted ribs.
+    `<path d="M8 52h8l3 6v14H5V58z" fill="url(#amber)" stroke="#8a6d00" stroke-width="0.8" fill-opacity="0.92"/>` +
+    `<path d="M9 60v11M12 59v13M15 60v11" stroke="#a88600" stroke-width="0.8" opacity="0.7"/>` +
+    // Black cushion-grip handle.
+    `<path d="M4 72h16v50q0 5-5 5H9q-5 0-5-5z" fill="url(#grip)" stroke="#000" stroke-width="0.8"/>` +
+    `<path d="M6.5 76v46M17.5 76v46" stroke="#4a4e54" stroke-width="0.7" opacity="0.7"/>` +
+    `</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }

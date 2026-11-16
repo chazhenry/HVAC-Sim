@@ -11,6 +11,7 @@ import { isMeterTool, meterModes } from './meterTools';
 import {
   clampDisplay, clampMeterImage, type MultimeterFace, MULTIMETER_SIZE, multimeterImage, type TempClampFace,
   TEMP_CLAMP_SIZE, tempClampImage, type TesterFace, TESTER_SIZE, testerImage,
+  DISCHARGE_SIZE, dischargeImage, NUTDRIVER_SIZE, nutdriverImage,
 } from './toolIcons';
 
 function testerFace(s: AppState): TesterFace {
@@ -124,6 +125,8 @@ export function HeldMeter(): ReactNode {
   const meterKey = useSim((s) => (s.tool === 'multimeter' ? JSON.stringify(multimeterFace(s)) : ''));
   const testerKey = useSim((s) => (s.tool === 'ncv' ? JSON.stringify(testerFace(s)) : ''));
   const tempKey = useSim((s) => (s.tool === 'tempclamp' ? JSON.stringify(tempClampFace(s)) : ''));
+  // The discharge tool shows only the clip that goes on next: black (on Common) first, then red.
+  const dischargeNext = useSim((s) => (s.dischargeClips.black === null ? 'black' : 'red'));
   useMultimeterDial(tool === 'multimeter');
 
   const drawing = useMemo(() => {
@@ -134,8 +137,11 @@ export function HeldMeter(): ReactNode {
     if (meterKey) return { src: multimeterImage(JSON.parse(meterKey) as MultimeterFace), size: MULTIMETER_SIZE };
     if (testerKey) return { src: testerImage(JSON.parse(testerKey) as TesterFace), size: TESTER_SIZE };
     if (tempKey) return { src: tempClampImage(JSON.parse(tempKey) as TempClampFace), size: TEMP_CLAMP_SIZE };
+    // Tools drawn without a display.
+    if (tool === 'discharge') return { src: dischargeImage(dischargeNext), size: DISCHARGE_SIZE };
+    if (tool === 'nutdriver') return { src: nutdriverImage(), size: NUTDRIVER_SIZE };
     return null;
-  }, [clampKey, meterKey, testerKey, tempKey]);
+  }, [clampKey, meterKey, testerKey, tempKey, tool, dischargeNext]);
 
   if (!drawing || !isMeterTool(tool)) return null;
   if (touch) {

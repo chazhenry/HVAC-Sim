@@ -19,15 +19,20 @@ describe('clicking something that cannot be clamped', () => {
   });
 });
 
-describe('click toast beside the meter', () => {
-  it('goes to the side with more room, clear of the meter, or centres when no meter is drawn', async () => {
-    const { clickToastLeft } = await import('../ui/toastPlacement');
-    // Click on the left half: toast to the right of a 76 px meter (half 38) plus the gap.
-    expect(clickToastLeft(300, 200, 1200, 38)).toBe(300 + 38 + 14);
-    // Click on the right half: toast to the left, its right edge clear of the meter.
-    expect(clickToastLeft(900, 200, 1200, 38)).toBe(900 - 38 - 14 - 200);
-    // No meter: centred on the click.
-    expect(clickToastLeft(600, 200, 1200, null)).toBe(500);
+describe('click toast beside the tool icon', () => {
+  it('goes beside the icon on the side of the 3D view with more room, centred on it', async () => {
+    const { iconBox, toastBesideIcon } = await import('../ui/toastPlacement');
+    const view = { left: 0, top: 50, right: 1200, bottom: 800 };
+    // A 76 x 128 clamp meter with its hot spot at 38, 30, clicked at 300, 400.
+    const meter = iconBox(300, 400, { width: 76, height: 128, hotX: 38, hotY: 30 });
+    expect(meter).toEqual({ left: 262, top: 370, right: 338, bottom: 498 });
+    // More room on the right: the toast starts just past the icon's right edge, centred on the icon.
+    expect(toastBesideIcon(meter, 200, 40, view)).toEqual({ left: 338 + 14, top: 434 - 20 });
+    // Near the right edge: the toast ends just before the icon's left edge.
+    const right = iconBox(1000, 400, { width: 32, height: 32, hotX: 2, hotY: 2 });
+    expect(toastBesideIcon(right, 200, 40, view).left).toBe(998 - 14 - 200);
+    // Kept inside the view vertically.
+    expect(toastBesideIcon(iconBox(300, 790, { width: 32, height: 32, hotX: 2, hotY: 2 }), 200, 40, view).top).toBe(760);
   });
 });
 

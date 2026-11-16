@@ -158,7 +158,8 @@ export const WIRES: readonly WireDef[] = [
     points: [p('LV_SW'), [0.165, 0.5, 0.295], [0.16, 0.64, 0.3], p('COIL_A')],
   },
   { id: 'lv-c', color: BLUE, radius: LV, points: [p('COIL_B'), [0.315, 0.71, 0.29], [0.325, 0.4, 0.27], [0.3, 0.16, 0.262]] },
-  { id: 'gnd', color: '#2e7d32', radius: HV, points: [p('GND_LUG'), [0.405, 0.7, 0.27], [0.415, 0.45, 0.3]] },
+  // Equipment ground: in through the power whip with L1/L2, landed on the chassis lug.
+  { id: 'gnd', color: '#2e7d32', radius: HV, points: [[0.405, 0.435, 0.395], [0.415, 0.5, 0.37], [0.41, 0.7, 0.3], p('GND_LUG')] },
 ];
 
 export interface View {
@@ -170,7 +171,8 @@ export interface View {
 /** Camera presets for the condenser. The first one is the starting view. */
 export const VIEWS: readonly View[] = [
   { label: 'Whole unit', camera: [1.5, 1.25, 2.3], target: [0.2, 0.55, 0] },
-  { label: 'Control box', camera: [0.42, 0.72, 1.12], target: [0.28, 0.56, 0.3] },
+  // Low enough to show the bottom of the run capacitor and its charge LED.
+  { label: 'Control box', camera: [0.42, 0.64, 1.12], target: [0.28, 0.5, 0.3] },
   { label: 'Top / compressor', camera: [-0.75, 1.75, 0.85], target: [-0.08, 0.45, -0.1] },
   { label: 'Disconnect', camera: [1.05, 1.25, 0.15], target: [1.0, 1.15, -0.65] },
   { label: 'Service valves', camera: [1.35, 0.55, 0.8], target: [0.55, 0.26, 0.15] },

@@ -24,7 +24,7 @@ import {
   SWITCH_BOX,
 } from './furnaceLayout';
 import type { WireDef } from './layout';
-import { interactive, makeTextTexture, Movable, named, solid, TestPoint, Tube, Wire } from './parts';
+import { CapChargeLed, interactive, makeTextTexture, Movable, named, solid, TestPoint, Tube, Wire } from './parts';
 
 const CABINET = '#b4bac1';
 const DOOR = '#c7ccd2';
@@ -265,6 +265,7 @@ function BoardLed(): ReactNode {
 function BlowerCompartment(): ReactNode {
   const wheel = useRef<THREE.Group>(null);
   const taped = useSim((s) => s.doorSwitchTaped);
+  const capCharge = useSim((s) => (s.furnace?.capCharged ? 1 : 0));
   useFrame((_, delta) => {
     const speed = useSim.getState().furnace?.blowerSpeed ?? 0;
     if (wheel.current) wheel.current.rotation.x += delta * speed * 22;
@@ -345,6 +346,7 @@ function BlowerCompartment(): ReactNode {
         <cylinderGeometry args={[0.028, 0.028, 0.08, 20]} />
         <meshStandardMaterial color="#d5d8db" metalness={0.85} roughness={0.25} />
       </mesh>
+      <CapChargeLed position={[0.184, 0.106, 0.242]} radius={0.0035} charge={capCharge} facing={0.71} />
 
       {/* Door interlock switch */}
       <mesh position={DOOR_SWITCH as unknown as THREE.Vector3Tuple}>

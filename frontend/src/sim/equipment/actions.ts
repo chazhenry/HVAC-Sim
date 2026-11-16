@@ -12,6 +12,11 @@ export function applyEquipmentAction(state: OutdoorActionState, action: Equipmen
     result.events.push({ type, componentId, t: sim.t, safe });
   };
   if (action.type === 'disconnect.toggle') {
+    // The pull-out is behind the hinged cover: it cannot be pulled or inserted until the cover is open.
+    if (!state.doorOpen) {
+      say('Open the disconnect cover first - the pull-out is behind it.', 'warn');
+      return result;
+    }
     const disconnectIn = !sim.controls.disconnectIn;
     result.sim = resolve({ ...sim, controls: { ...sim.controls, disconnectIn } });
     event(disconnectIn ? 'power.restored' : 'power.isolated', 'system.outdoor.fuses');

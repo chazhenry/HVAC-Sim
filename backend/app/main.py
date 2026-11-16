@@ -29,6 +29,7 @@ from .exam import (
     section_info,
 )
 from . import llm, auth
+from .videos import FILE_PREFIX as VIDEO_FILE_PREFIX, videos_router
 from .grading import grade
 from .feedback import FeedbackRequest
 from .contexts import CONTEXTS, apply_context
@@ -73,14 +74,16 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def authentication(request: Request, call_next):
-        if request.url.path.startswith("/api/") and request.method != "OPTIONS" and request.url.path not in auth.PUBLIC_PATHS:
+        # Video files carry their own signed link (a <video> element cannot send the sign-in header).
+        signed_video = request.url.path.startswith(VIDEO_FILE_PREFIX)
+        if request.url.path.startswith("/api/") and request.method != "OPTIONS" and request.url.path not in auth.PUBLIC_PATHS and not signed_video:
             try:
                 auth.authorize(request, store)
             except HTTPException as error:
                 return JSONResponse({"detail": error.detail}, status_code=error.status_code,
                                     headers={**(error.headers or {}), "Cache-Control": "no-store"})
         response = await call_next(request)
-        if request.url.path.startswith("/api/"):
+        if request.url.path.startswith("/api/") and not signed_video:
             response.headers["Cache-Control"] = "no-store"
         return response
 
@@ -100,6 +103,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     )
 
     app.include_router(auth.auth_router(store, allowed_origins()))
+    app.include_router(videos_router())
 
     def load(session_id: str, request: Request) -> tuple[SessionRow, Scenario]:
         row = store.get(session_id)

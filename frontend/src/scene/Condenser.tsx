@@ -15,7 +15,7 @@ import {
   TOP_Y,
   WIRES,
 } from './layout';
-import { interactive, LouverWall, makeFinTexture, makeTextTexture, Movable, named, smoothCurve, solid, TestPoint, Tube, Wire } from './parts';
+import { CapChargeLed, interactive, LouverWall, makeFinTexture, makeTextTexture, Movable, named, smoothCurve, solid, TestPoint, Tube, Wire } from './parts';
 
 const CABINET = '#c4c7c2';
 const GALV = '#9aa1a5';
@@ -244,6 +244,8 @@ function ControlBox(): ReactNode {
   const heatPump = useSim((s) => s.context?.systemType === 'heat_pump');
   const contactorIn = useSim((s) => s.sim?.contactorIn ?? false);
   const contactor = interactive('Contactor - 2 pole, 24 V coil', () => useSim.getState().clickPart('contactor'));
+  // Charge left: half per section bled with the discharge tool.
+  const capCharge = useSim((s) => (s.sim?.capCharged ? 1 - (s.bledSections.herm ? 0.5 : 0) - (s.bledSections.fan ? 0.5 : 0) : 0));
   const capacitor = interactive('Dual run capacitor - 45/5 uF 440 V', () => useSim.getState().clickPart('capacitor'));
   const ids = (Object.keys(TEST_POINTS) as TestPointId[]).filter((id) => TEST_POINTS[id].enclosure === 'controlBox');
   return (
@@ -293,6 +295,8 @@ function ControlBox(): ReactNode {
         <cylinderGeometry args={[0.042, 0.042, 0.13, 28]} />
         <meshStandardMaterial color="#d5d8db" metalness={0.85} roughness={0.25} />
       </mesh>
+      {/* Charge LED, lower right of the capacitor's face */}
+      <CapChargeLed position={[0.39, 0.309, 0.346]} radius={0.0045} charge={capCharge} facing={0.77} />
       <mesh position={[0.36, 0.36, 0.276]}>
         <boxGeometry args={[0.1, 0.03, 0.006]} />
         <Metal color={GALV} />

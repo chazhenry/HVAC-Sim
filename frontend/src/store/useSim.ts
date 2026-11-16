@@ -200,6 +200,10 @@ export interface AppState {
   /** The clamp was just put on a wire it cannot usefully read: the meter shows a red ✕ briefly. */
   clampRejected: boolean;
   ncvAt: AnyTestPointId | null;
+  /** Capacitor discharge tool leads: black goes on Common first, then red bleeds one section at a time. */
+  dischargeClips: { black: AnyTestPointId | null; red: AnyTestPointId | null };
+  /** Dual run capacitor sections bled so far with the discharge tool (both are needed). */
+  bledSections: { herm: boolean; fan: boolean };
   gauges: { low: boolean; high: boolean };
   tempClamps: { suction: boolean; liquid: boolean };
   /** true = fitted to the unit. */
@@ -313,6 +317,8 @@ const fresh = {
   clampAt: null,
   clampRejected: false,
   ncvAt: null,
+  dischargeClips: { black: null, red: null },
+  bledSections: { herm: false, fan: false },
   gauges: { low: false, high: false },
   tempClamps: { suction: false, liquid: false },
   panels: { access: true, louver: true, top: true },
@@ -392,6 +398,67 @@ export const useSim = create<AppState>()((set, get) => {
       terminals: [leads.red, leads.black],
       safe: reading.unit === 'V' || (!sim.controls.disconnectIn && !sim.capCharged),
     }]);
+  };
+
+  /** Clicking a capacitor body with the discharge tool: the clips go on its terminals. */
+  const discharging = (): void => {
+    const { black } = get().dischargeClips;
+    say(black ? 'Clip the red lead onto a capacitor terminal - not the body.' : 'Clip the black lead onto the Common terminal first - not the body.', 'warn');
+    playCue('toolMisuse');
+  };
+
+  /** True only while the discharge tool itself bleeds the furnace blower capacitor (not a body click). */
+  let bleeding = false;
+
+  /**
+   * Two-clip capacitor discharge. Black goes on Common first and stays there; red then goes on HERM to
+   * bleed the compressor section and on FAN to bleed the fan section (lifting after each). The capacitor
+   * counts as discharged once both sections are bled. A furnace blower capacitor has one section:
+   * black on either terminal, red on the other. Clicking the black clip again takes both clips off.
+   */
+  const clipDischarge = (id: AnyTestPointId): void => {
+    const { dischargeClips: clips } = get();
+    const name = pointInfo(id).label;
+    if (clips.black === id) {
+      set({ dischargeClips: { black: null, red: null } });
+      say('Discharge clips removed.');
+      return;
+    }
+    if (clips.black === null) {
+      if (!isFurnacePoint(id) && id !== 'CAP_C') {
+        say('Clip the black lead to the Common terminal first.', 'warn');
+        playCue('toolMisuse');
+        return;
+      }
+      set({ dischargeClips: { black: id, red: null } });
+      playCue('leadPlaced');
+      say(`Black clip on ${name}. Now clip red to a section terminal.`);
+      return;
+    }
+    if (isFurnacePoint(id)) {
+      bleeding = true;
+      try { get().clickFurnace('blowerCap'); } finally { bleeding = false; }
+      set({ dischargeClips: { black: null, red: null } });
+      return;
+    }
+    const section = id === 'CAP_HERM' ? 'herm' : id === 'CAP_FAN' ? 'fan' : null;
+    if (!section) return;
+    const state = get();
+    if (activeHot(state, 'CAP_C') || activeHot(state, id)) {
+      violation('Tried to discharge the capacitor with the circuit energised');
+      set({ dischargeClips: { ...clips, red: null } });
+      return;
+    }
+    const bled = { ...state.bledSections, [section]: true };
+    set({ bledSections: bled, dischargeClips: { ...clips, red: null } });
+    say(`${section === 'herm' ? 'Compressor (HERM)' : 'Fan'} section bled through the resistor.${bled.herm && bled.fan ? '' : ` Now move red to ${section === 'herm' ? 'FAN' : 'HERM'}.`}`, 'good');
+    playCue('leadPlaced');
+    if (bled.herm && bled.fan) {
+      // Both sections done: the capacitor is safe. Record it the same way as before.
+      const component = componentForTarget('condenser', 'capacitor');
+      if (component) runEquipmentAction({ type: 'component.use', componentId: component.id, tool: 'discharge' });
+      set({ dischargeClips: { black: null, red: null }, bledSections: { herm: false, fan: false } });
+    }
   };
 
   const needTool = (wanted: ToolId, text: string): boolean => {
@@ -535,6 +602,7 @@ export const useSim = create<AppState>()((set, get) => {
         set({
           ...(previous === 'clamp' ? { clampAt: null, clampRejected: false } : {}),
           ...(previous === 'ncv' ? { ncvAt: null } : {}),
+          ...(previous === 'discharge' ? { dischargeClips: { black: null, red: null }, bledSections: { herm: false, fan: false } } : {}),
           ...(previous === 'multimeter' ? { leads: { red: null, black: null }, nextLead: 'red' as const } : {}),
           ...(previous === 'tempclamp' ? { tempClamps: { suction: false, liquid: false } } : {}),
           ...(previous === 'manometer' ? { manoAt: null } : {}),
@@ -641,6 +709,11 @@ export const useSim = create<AppState>()((set, get) => {
 
     clickPullout: () => {
       if (!needTool('hand', 'Select the hand to pull or insert the disconnect.')) return;
+      if (!get().doorOpen) {
+        say('Open the disconnect cover first - the pull-out is behind it.', 'warn');
+        playCue('toolMisuse');
+        return;
+      }
       runEquipmentAction({ type: 'disconnect.toggle' });
     },
 
@@ -665,8 +738,10 @@ export const useSim = create<AppState>()((set, get) => {
         const same = get().ncvAt === id;
         set((s) => ({ ncvAt: same ? null : id, measurements: s.measurements + (same ? 0 : 1) }));
       } else if (tool === 'discharge' && pointInfo(id).onCapacitor) {
-        if (isFurnacePoint(id)) get().clickFurnace('blowerCap');
-        else get().clickPart('capacitor');
+        clipDischarge(id);
+      } else if (tool === 'discharge') {
+        say('Clip the discharge leads onto the capacitor terminals.', 'warn');
+        playCue('toolMisuse');
       } else {
         say('Select the multimeter or the voltage tester to probe a terminal.');
       }
@@ -722,6 +797,7 @@ export const useSim = create<AppState>()((set, get) => {
     },
 
     clickPart: (target) => {
+      if (target === 'capacitor' && get().tool === 'discharge') { discharging(); return; }
       const component = componentForTarget('condenser', target);
       if (component) runEquipmentAction({ type: 'component.use', componentId: component.id, tool: get().tool });
     },
@@ -729,6 +805,7 @@ export const useSim = create<AppState>()((set, get) => {
     clickFurnace: (target) => {
       const state = get();
       if (!state.furnace) return;
+      if (target === 'blowerCap' && state.tool === 'discharge' && !bleeding) { discharging(); return; }
       const result = applyFurnaceAction({ ...state, furnace: state.furnace }, { type: 'furnace.use', target, tool: state.tool });
       set({ furnace: result.furnace, fdoors: result.fdoors, doorSwitchTaped: result.doorSwitchTaped,
         manoAt: result.manoAt, probes: result.probes, measurements: state.measurements + result.measurements });

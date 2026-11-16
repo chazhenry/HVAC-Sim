@@ -28,6 +28,7 @@ import { unlockAudio } from './audio/tones';
 import { CursorPartLabel } from './ui/CursorPartLabel';
 import { IdentifyLabel } from './ui/IdentifyLabel';
 import { APP_VERSION } from './version';
+import { FirstPrinciples } from './ui/FirstPrinciples';
 
 const TICK_SECONDS = 0.1;
 /** Where text may still be selected on the job screen. */
@@ -207,6 +208,7 @@ export function App(): ReactNode {
       {phase === 'running' && submitting && <SubmitDialog onClose={() => setSubmitting(false)} />}
       {phase === 'graded' && <ResultDialog />}
       <JobLogToasts />
+      <FirstPrinciples />
       <VisitsAdmin />
     </div>
   );

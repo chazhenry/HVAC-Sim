@@ -4,6 +4,7 @@ import { PinButton } from './LayoutControls';
 import { useSim } from '../store/useSim';
 import { toolIconUrl } from './toolIcons';
 import { type PlacedTool, useToolGroups } from './toolGroups';
+import { useVideos } from '../store/useVideos';
 
 function ToolTile({ item, active, onPick }: { item: PlacedTool; active: boolean; onPick: () => void }): ReactNode {
   return (
@@ -28,7 +29,12 @@ function ToolBag({ onPicked }: { onPicked?: () => void }): ReactNode {
           <h3>{group.title}</h3>
           <div className="tool-grid">
             {group.tools.map((t) => (
-              <ToolTile key={t.id} item={t} active={tool === t.id} onPick={() => { setTool(t.id); onPicked?.(); }} />
+              <ToolTile key={t.id} item={t} active={tool === t.id} onPick={() => {
+                // First Principles is a library, not a tool to hold: it opens the video list instead.
+                if (t.id === 'firstprinciples') useVideos.getState().openMenu();
+                else setTool(t.id);
+                onPicked?.();
+              }} />
             ))}
           </div>
         </section>

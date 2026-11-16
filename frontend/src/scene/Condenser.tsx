@@ -13,6 +13,7 @@ import {
   MANIFOLD_POS,
   SUCTION_VALVE,
   TOP_Y,
+  type Vec3,
   WIRES,
 } from './layout';
 import { CapChargeLed, interactive, LouverWall, makeFinTexture, makeTextTexture, Movable, named, smoothCurve, solid, TestPoint, Tube, Wire } from './parts';
@@ -76,32 +77,29 @@ function Coil(): ReactNode {
 }
 
 /** Where the fan harness lands on top of the control box. */
-const HARNESS_ANCHOR = new THREE.Vector3(0.37, 0.9, 0.268);
 
 /**
- * Fan motor wiring. One end follows the motor as the top swings, the other
- * stays in the control box, so the harness is rebuilt while the lid moves.
+ * Fan motor wiring: level with the ground, from the side of the motor body out to the metal fan housing
+ * (in its back-right corner, by the hinge, so the leads barely move when the top swings up), then forward along the right side wall to the control box, where it drops in to meet
+ * the harness from the fan plug. The motor-side points ride on the fan top (they move with it when it
+ * hinges up); the run from the housing into the box stays put.
  */
-function FanHarness({ motorEnd }: { motorEnd: RefObject<THREE.Object3D | null> }): ReactNode {
+function FanHarness({ route }: { route: RefObject<THREE.Object3D | null>[] }): ReactNode {
   const mesh = useRef<THREE.Mesh>(null);
   const last = useRef(new THREE.Vector3(Infinity, 0, 0));
-  const tip = useMemo(() => new THREE.Vector3(), []);
+  const points = useMemo(() => route.map(() => new THREE.Vector3()), [route]);
   useFrame(() => {
-    if (!motorEnd.current || !mesh.current) return;
-    motorEnd.current.getWorldPosition(tip);
-    if (tip.distanceToSquared(last.current) < 1e-6) return;
-    last.current.copy(tip);
-    // Slack loop: leaves the motor sideways, droops, then drops into the box.
-    const droop = tip.clone().lerp(HARNESS_ANCHOR, 0.5).add(new THREE.Vector3(0.05, -0.05, 0.02));
-    const curve = smoothCurve([
-      tip.clone(),
-      tip.clone().add(new THREE.Vector3(0.06, -0.02, 0.02)),
-      droop,
-      HARNESS_ANCHOR.clone().add(new THREE.Vector3(0, 0.05, 0)),
-      HARNESS_ANCHOR,
-    ]);
+    if (!mesh.current || route.some((ref) => !ref.current)) return;
+    route.forEach((ref, i) => ref.current!.getWorldPosition(points[i]!));
+    const edge = points[points.length - 1]!;
+    if (edge.distanceToSquared(last.current) < 1e-6) return;
+    last.current.copy(edge);
+    // The waypoints are found in world space; the tube lives in its parent's (scaled) frame.
+    const parent = mesh.current.parent;
+    const onTop = points.map((point) => (parent ? parent.worldToLocal(point.clone()) : point.clone()));
+    const curve = smoothCurve([...onTop, ...HARNESS_TO_BOX.map(([x, y, z]) => new THREE.Vector3(x, y, z))]);
     mesh.current.geometry.dispose();
-    mesh.current.geometry = new THREE.TubeGeometry(curve, 72, 0.008, 12, false);
+    mesh.current.geometry = new THREE.TubeGeometry(curve, 96, 0.008, 10, false);
   });
   return (
     <mesh ref={mesh} castShadow {...named('Fan motor wiring harness')}>
@@ -111,10 +109,29 @@ function FanHarness({ motorEnd }: { motorEnd: RefObject<THREE.Object3D | null> }
   );
 }
 
+/** Harness waypoints on the fan top, in its frame: a level run (2 cm under the top panel) to the housing's back-right corner, by the hinge. */
+const HARNESS_ROUTE: readonly Vec3[] = [
+  [0.041, -0.02, -0.041], // on the motor body
+  [0.2, -0.02, -0.2],
+  [0.405, -0.02, -0.405], // meets the fan housing in its back-right corner, by the hinge
+];
+
+/** From the corner, still level, forward along the right side wall to the control box, then down to the plug harness (layout WIRES). */
+const HARNESS_TO_BOX: readonly Vec3[] = [
+  [0.41, 0.935, -0.3],
+  [0.41, 0.935, 0.1],
+  [0.39, 0.935, 0.235],
+  [0.37, 0.935, 0.268],
+  [0.37, 0.905, 0.268],
+];
+
 function FanTop(): ReactNode {
   const fitted = useSim((s) => s.panels.top);
   const blades = useRef<THREE.Group>(null);
-  const motorEnd = useRef<THREE.Object3D>(null);
+  const r0 = useRef<THREE.Object3D>(null);
+  const r1 = useRef<THREE.Object3D>(null);
+  const r2 = useRef<THREE.Object3D>(null);
+  const route = useMemo(() => [r0, r1, r2], []);
   useFrame((_, delta) => {
     const speed = useSim.getState().sim?.fanSpeed ?? 0;
     if (blades.current) blades.current.rotation.y -= delta * speed * 30;
@@ -149,11 +166,11 @@ function FanTop(): ReactNode {
 
   return (
     <>
-    <FanHarness motorEnd={motorEnd} />
+    <FanHarness route={route} />
     {/* Hinged along the back edge: the top swings up and stays wired, as on a real unit. */}
     <Movable fitted={fitted} home={[0, TOP_Y, -HALF]} away={[0, TOP_Y, -HALF]} awayRotation={[-1.12, 0, 0]}>
      <group position={[0, 0, HALF]}>
-      <object3D ref={motorEnd} position={[0.058, -0.06, 0]} />
+      {HARNESS_ROUTE.map((point, i) => <object3D key={i} ref={route[i] ?? null} position={point} />)}
       <mesh geometry={plate} castShadow receiveShadow {...topHandlers}>
         <Metal />
       </mesh>

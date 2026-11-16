@@ -60,6 +60,12 @@ const CONDENSER_GROUPS: readonly ToolGroup[] = [
         how: "Click the disconnect cover to open it, and the pull-out to kill or restore power.",
       },
       {
+        id: "nutdriver",
+        name: "Nut driver",
+        badge: "ND",
+        how: "Click a panel to remove it (access panel, front louver panel) or to swing the fan top up. Click it again to refit.",
+      },
+      {
         id: "speak",
         name: "Speak",
         badge: "SP",
@@ -70,12 +76,6 @@ const CONDENSER_GROUPS: readonly ToolGroup[] = [
         name: "First Principles",
         badge: "FP",
         how: "Opens the First Principles video library. Pick a video to watch it; your tool in hand is unchanged.",
-      },
-      {
-        id: "nutdriver",
-        name: "Nut driver",
-        badge: "ND",
-        how: "Click a panel to remove it (access panel, front louver panel) or to swing the fan top up. Click it again to refit.",
       },
     ],
   },

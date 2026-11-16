@@ -12,7 +12,8 @@ const THERMOMETER =
   '<path d="M12 3a2 2 0 0 0-2 2v9.2a4 4 0 1 0 4 0V5a2 2 0 0 0-2-2z"/><circle cx="12" cy="17.5" r="1.6" fill="FILL"/><path d="M12 16V8"/>';
 
 const ICONS: Record<ToolId, string> = {
-  firstprinciples: '<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 0 2 2h13v-4"/><path d="M8.5 7.5h6.5M8.5 10.5h4.5"/>',
+  // Graduation cap (mortarboard) with its tassel.
+  firstprinciples: '<path d="M1.5 9.5 12 4.5l10.5 5-10.5 5z"/><path d="M6 11.6v4.4c0 1.7 2.7 3.2 6 3.2s6-1.5 6-3.2v-4.4"/><path d="M21 10.2v6.3"/><circle cx="21" cy="17.6" r="1.1" fill="FILL"/>',
   speak: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/>',
   hand: '<path d="M9 12V5.5a1.5 1.5 0 0 1 3 0V11l5 1a2 2 0 0 1 1.6 2v2.5a5 5 0 0 1-5 5h-1.8a5 5 0 0 1-4.3-2.5L5 14.6a1.4 1.4 0 0 1 2.2-1.7L9 14.6"/>',
   nutdriver:

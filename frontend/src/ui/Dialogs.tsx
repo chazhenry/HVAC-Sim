@@ -9,9 +9,7 @@ import type { TrainingTrack } from '../training/catalog';
 import { AccountControls } from './AccountControls';
 import { logSignInChoice } from '../store/visitLog';
 import { tracks } from '../training/tracks';
-
-/** Equipment selected when the menu opens: the Goodman GSZB4 split system. */
-const DEFAULT_CONTEXT_ID = 'goodman-gszb403610';
+import { DEFAULT_CONTEXT_ID } from './EquipmentPicker';
 
 /** Notes the sign-in with the mode and equipment first chosen, e.g. "Residential troubleshooting / Generic-ac". */
 function logLogin(track: TrainingTrack, detail: string): void {

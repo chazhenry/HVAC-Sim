@@ -17,6 +17,17 @@ export function downloadContext(context: EquipmentContext): void {
 
 const MAX_BYTES = 128_000;
 
+/** The featured unit: selected when the menu opens and listed first. */
+export const DEFAULT_CONTEXT_ID = "goodman-gszb403610";
+
+/** Built-in equipment with the featured unit first, the rest in catalog order. */
+export function orderContexts(contexts: EquipmentContext[]): EquipmentContext[] {
+  return [
+    ...contexts.filter((context) => context.id === DEFAULT_CONTEXT_ID),
+    ...contexts.filter((context) => context.id !== DEFAULT_CONTEXT_ID),
+  ];
+}
+
 /** Equipment configuration JSON, validated by the server. */
 async function parseContext(text: string): Promise<EquipmentContext> {
   if (text.length > MAX_BYTES) throw new Error("Equipment files must be under 128 KB.");
@@ -67,7 +78,7 @@ export function EquipmentPicker({
   };
 
   const options = [
-    ...contexts.filter((context) => !imported.some((item) => item.id === context.id)),
+    ...orderContexts(contexts).filter((context) => !imported.some((item) => item.id === context.id)),
     ...imported,
   ];
   return (

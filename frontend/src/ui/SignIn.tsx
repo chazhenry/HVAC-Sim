@@ -4,6 +4,7 @@ import { passwordRequirements } from "../auth/password";
 import { rememberedEmail, rememberEmail } from "../store/guest";
 import { useAuth } from "../store/useAuth";
 import { APP_VERSION } from "../version";
+import previewImage from "../assets/signin-preview.png";
 
 export function SignIn(): ReactNode {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -62,14 +63,25 @@ export function SignIn(): ReactNode {
       aria-describedby="guest-signin-notice"
       onCancel={(event) => event.preventDefault()}
     >
-      <h1 id="guest-signin-title">
-        HVAC-SIM <span className="app-version">(v{APP_VERSION})</span>
-      </h1>
-      <h2>{register ? "Create your account" : "Sign in"}</h2>
-      <p id="guest-signin-notice">
-        HVAC-SIM is a private demo for invited guests. It is not for public
-        viewing and not certified for HVAC production use.
-      </p>
+      <div className="guest-signin-intro">
+        <div className="guest-signin-heading">
+          <h1 id="guest-signin-title">
+            HVAC-SIM <span className="app-version">(v{APP_VERSION})</span>
+          </h1>
+          <h2>Login / Register</h2>
+          <p id="guest-signin-notice">
+            HVAC-SIM is a private demo for invited guests. It is not for public
+            viewing and not certified for HVAC production use.
+          </p>
+        </div>
+        <img
+          className="guest-signin-preview"
+          src={previewImage}
+          width={1197}
+          height={702}
+          alt="HVAC-Sim: a 3D outdoor condensing unit with its control box open, the air handler behind it, and the tool bag of meters and gauges on the left."
+        />
+      </div>
       <form
         className="guest-signin-form"
         onSubmit={async (event) => {
@@ -126,6 +138,7 @@ export function SignIn(): ReactNode {
             </label>
           </div>
         )}
+        <div className={`auth-name-fields${register ? " three" : ""}`}>
         <label>
           Email
           <input
@@ -162,6 +175,27 @@ export function SignIn(): ReactNode {
           </span>
         </label>
         {register && (
+          <label>
+            Confirm password
+            <span className="password-field">
+              <input
+                className={validity(confirmation.length > 0 && matches)}
+                type={show ? "text" : "password"}
+                name="confirm-password"
+                autoComplete="new-password"
+                required
+                maxLength={128}
+                value={confirmation}
+                disabled={busy}
+                aria-invalid={confirmation.length > 0 && !matches}
+                onChange={(event) => setConfirmation(event.target.value)}
+              />
+              {eye}
+            </span>
+          </label>
+        )}
+        </div>
+        {register && (
           <>
             <ul className="password-rules" id="password-rules">
               {requirements
@@ -173,24 +207,6 @@ export function SignIn(): ReactNode {
                   </li>
                 ))}
             </ul>
-            <label>
-              Confirm password
-              <span className="password-field">
-                <input
-                  className={validity(confirmation.length > 0 && matches)}
-                  type={show ? "text" : "password"}
-                  name="confirm-password"
-                  autoComplete="new-password"
-                  required
-                  maxLength={128}
-                  value={confirmation}
-                  disabled={busy}
-                  aria-invalid={confirmation.length > 0 && !matches}
-                  onChange={(event) => setConfirmation(event.target.value)}
-                />
-                {eye}
-              </span>
-            </label>
             {confirmation && !matches && (
               <p className="error" role="status">
                 Passwords do not match.

@@ -14,6 +14,7 @@ import { api } from "../api/client";
 import { ThermostatDialog } from "./Thermostat";
 import { useCoarsePointer, useDictationNotices, useJobViews, useWindowWidth } from "./layoutHooks";
 import { AudioSettings } from "./AudioSettings";
+import { useControls } from "../store/useControls";
 
 /** A pushpin: pinned elements stay in their column or row; unpinned ones open from a button. */
 export function PinButton({
@@ -450,6 +451,8 @@ export function LayoutPanel(): ReactNode {
   } = useLayout.getState();
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"layout" | "display" | "audio">("layout");
+  const wheelDownZoomsIn = useControls((s) => s.wheelDownZoomsIn);
+  const setWheelDownZoomsIn = useControls((s) => s.setWheelDownZoomsIn);
   const file = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -518,6 +521,23 @@ export function LayoutPanel(): ReactNode {
                   <small>
                     Readings always show on the tools in the 3D view. Turn this
                     on to repeat them in the job panel too.
+                  </small>
+                </span>
+              </label>
+            </li>
+            <li>
+              <label>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={wheelDownZoomsIn}
+                  onChange={() => setWheelDownZoomsIn(!wheelDownZoomsIn)}
+                />
+                <span>
+                  <strong>Roll the mouse wheel down to zoom in</strong>
+                  <small>
+                    Off: roll up (away from you) to zoom in, as most 3D apps
+                    do. On: the reverse.
                   </small>
                 </span>
               </label>

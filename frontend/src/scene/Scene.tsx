@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { type ComponentRef, type ReactNode, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { create } from 'zustand';
+import { useControls } from '../store/useControls';
 import { HOLD_MS, HOLD_SLOP_PX, useIdentify } from '../store/useIdentify';
 import { useSim } from '../store/useSim';
 import { Condenser } from './Condenser';
@@ -26,12 +27,15 @@ function Controls(): ReactNode {
   const flight = useRef<{ t: number; fromPos: THREE.Vector3; fromTarget: THREE.Vector3; to: View } | null>(null);
   const canvas = useThree((s) => s.gl.domElement);
 
-  // Mouse wheel: rolling DOWN zooms IN (the reverse of the orbit controls' default). Each plain wheel
-  // event is swapped for a mirrored copy before the controls see it. Pinch-zoom on a touch screen is
-  // untouched, and Ctrl/Shift + wheel stay free for resizing a meter or turning the multimeter dial.
+  const wheelDownZoomsIn = useControls((s) => s.wheelDownZoomsIn);
+
+  // Mouse wheel direction (Settings > Display). By default rolling UP zooms in, as the orbit controls
+  // do. With "roll down to zoom in" on, each plain wheel event is swapped for a mirrored copy before
+  // the controls see it. Pinch-zoom on a touch screen is untouched, and Ctrl/Shift + wheel stay free
+  // for resizing a meter or turning the multimeter dial.
   useEffect(() => {
     const host = canvas.parentElement;
-    if (!host) return;
+    if (!host || !wheelDownZoomsIn) return;
     const mirrored = new WeakSet<Event>();
     const flip = (event: WheelEvent): void => {
       if (mirrored.has(event) || event.ctrlKey || event.shiftKey || event.metaKey || event.target !== canvas) return;
@@ -46,7 +50,7 @@ function Controls(): ReactNode {
     };
     host.addEventListener('wheel', flip, { capture: true, passive: false });
     return () => host.removeEventListener('wheel', flip, { capture: true });
-  }, [canvas]);
+  }, [canvas, wheelDownZoomsIn]);
 
   useEffect(() => {
     if (!controls.current || request === 0) return;

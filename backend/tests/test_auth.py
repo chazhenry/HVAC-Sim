@@ -136,7 +136,7 @@ def test_login_errors_are_generic_and_rate_limited(setup, monkeypatch):
 def test_sessions_history_feedback_and_visits_use_authenticated_identity(setup, monkeypatch):
     path, app, first = setup
     owner = sign_up(first)
-    async def complete(messages):
+    async def complete(messages, model=None):
         return "Use the meter.", "test"
     monkeypatch.setattr(llm, "complete", complete)
     session = first.post("/api/sessions", json={"scenarioId": "orientation"}).json()["sessionId"]

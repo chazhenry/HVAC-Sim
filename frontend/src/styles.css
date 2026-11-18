@@ -2389,3 +2389,13 @@ kbd { font: 11px/1.4 Consolas, monospace; padding: 0 4px; color: var(--muted); b
 .video-list-title { flex: 1; font-weight: 600; min-width: 0; }
 .video-list-size { color: var(--muted); font-size: 12px; flex: none; }
 .video-player video { width: 100%; max-height: calc(100vh - 140px); background: #000; border-radius: 8px; display: block; }
+
+/* ---------- Settings > Models ---------- */
+.model-settings { display: flex; flex-direction: column; gap: 12px; }
+.model-setting { display: grid; grid-template-columns: 1fr minmax(200px, auto); align-items: center; gap: 12px; }
+.model-setting label { display: flex; flex-direction: column; gap: 2px; }
+.model-setting small { color: var(--muted); font-size: 12px; }
+.model-setting select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; }
+.model-setting select option:disabled { color: var(--muted); }
+.model-current { font-size: 13px; font-weight: 600; text-align: right; }
+@media (max-width: 520px) { .model-setting { grid-template-columns: 1fr; } .model-current { text-align: left; } }

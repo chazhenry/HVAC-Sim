@@ -30,6 +30,8 @@ from .exam import (
 )
 from . import llm, auth
 from .videos import FILE_PREFIX as VIDEO_FILE_PREFIX, videos_router
+from .app_config import AppConfig
+from .system_models import models_router, system_model
 from .grading import grade
 from .feedback import FeedbackRequest
 from .contexts import CONTEXTS, apply_context
@@ -70,7 +72,9 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
     llm.load_env_file()
     app = FastAPI(title="HVAC-Sim API", version="0.1.0")
     limiter = UsageLimiter()
-    store = SessionStore(db_path or os.environ.get("HVAC_SIM_DB", DEFAULT_DB))
+    database = db_path or os.environ.get("HVAC_SIM_DB", DEFAULT_DB)
+    store = SessionStore(database)
+    app_config = AppConfig.beside(database)
 
     @app.middleware("http")
     async def authentication(request: Request, call_next):
@@ -104,6 +108,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
 
     app.include_router(auth.auth_router(store, allowed_origins()))
     app.include_router(videos_router())
+    app.include_router(models_router(app_config))
 
     def load(session_id: str, request: Request) -> tuple[SessionRow, Scenario]:
         row = store.get(session_id)
@@ -230,7 +235,7 @@ def create_app(db_path: Path | str | None = None) -> FastAPI:
         try:
             config = store.get_context(session_id)
             equipment = EquipmentContext.model_validate_json(config) if config else None
-            reply, provider = await llm.complete(build_messages(scenario, body, equipment))
+            reply, provider = await llm.complete(build_messages(scenario, body, equipment), system_model(app_config, "chatbot"))
         except llm.LlmNotConfigured as e:
             raise HTTPException(status_code=503, detail=str(e)) from e
         except llm.LlmError as e:

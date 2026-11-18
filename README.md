@@ -111,8 +111,10 @@ It calls only when its mode is on and the room is past the setpoint; the room te
 
 **Chat tutor.** The right-hand pane has a Chat tab backed by `POST /api/sessions/{id}/chat`
 (`backend/app/tutor.py`, `backend/app/llm.py`). The backend calls DeepSeek, falling back to OpenAI;
-keys come from `backend/.env` (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`; model names from
-`DEEPSEEK_FLASH` / `HVAC_SIM_OPENAI_MODEL`). Each prompt carries a snapshot of what the learner
+keys come from `backend/.env` (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`). The models on offer are
+listed there too (`DEEPSEEK_MODELS`, `OPENAI_MODELS`, `ANTHROPIC_MODELS`, best first); the chat model
+is chosen in **Settings > Models** and kept in `app_config.json` beside the database. Until one is
+chosen, each provider uses the last model in its list. Each prompt carries a snapshot of what the learner
 can see and has measured (`frontend/src/ui/observations.ts`). The tutor is never given the answer
 key or the unit's hidden parameters, so it coaches from the readings and cannot leak the fault.
 Usage is capped per job and per minute.

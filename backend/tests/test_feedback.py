@@ -10,7 +10,7 @@ from app.main import create_app
 
 def test_feedback_uses_original_exchange_and_tags_guest(tmp_path: Path, monkeypatch) -> None:
     path = tmp_path / "feedback.db"
-    async def complete(messages):
+    async def complete(messages, model=None):
         return "Measure at the contactor.", "test"
     monkeypatch.setattr(llm, "complete", complete)
     client = TestClient(create_app(path))

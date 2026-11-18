@@ -48,3 +48,6 @@ desktop.ini
 # First Principles videos: large, shipped to the API server by deploy/deploy-backend.sh, not via git
 docs/1stPrinciples/*
 !docs/1stPrinciples/README.md
+
+# App-wide settings chosen in the app (Settings > Models); runtime state, like the database
+backend/app_config.json

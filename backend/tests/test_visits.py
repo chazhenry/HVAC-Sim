@@ -298,7 +298,7 @@ def test_chat_prompts_are_logged_as_chat_events(tmp_path: Path, monkeypatch: pyt
     path = tmp_path / "visits.db"
     monkeypatch.setattr(visits.httpx, "get", lambda url, **kwargs: httpx.Response(500, request=httpx.Request("GET", url)))
 
-    async def complete(messages: object) -> tuple[str, str]:
+    async def complete(messages: object, model: object = None) -> tuple[str, str]:
         return "Check the capacitor.", "test"
 
     from app import llm
@@ -318,7 +318,7 @@ def test_chat_prompts_are_logged_as_chat_events(tmp_path: Path, monkeypatch: pyt
 def test_admin_chat_is_not_logged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "visits.db"
 
-    async def complete(messages: object) -> tuple[str, str]:
+    async def complete(messages: object, model: object = None) -> tuple[str, str]:
         return "ok", "test"
 
     from app import llm

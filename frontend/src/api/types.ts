@@ -328,3 +328,20 @@ export interface VideoInfo {
   sizeBytes: number;
   url: string;
 }
+
+/** A model offered in Settings > Models, as "provider:model". */
+export interface ModelChoice {
+  id: string;
+  provider: string;
+  model: string;
+  available: boolean;
+  reason: string | null;
+}
+
+/** The system chatbot and router models. `options` is filled only for those who can change them. */
+export interface ModelSettings {
+  canEdit: boolean;
+  chatbot: string | null;
+  router: string | null;
+  options: ModelChoice[];
+}

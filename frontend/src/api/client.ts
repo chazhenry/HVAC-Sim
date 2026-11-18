@@ -16,7 +16,7 @@ import type {
   VisitsPage,
 } from './types';
 import { useAuth } from '../store/useAuth';
-import type { VideoInfo } from './types';
+import type { ModelSettings, VideoInfo } from './types';
 import { APP_VERSION } from '../version';
 
 export class ApiError extends Error {
@@ -89,6 +89,9 @@ export const api = {
   chat: (sessionId: string, body: ChatRequest) =>
     request<ChatResponse>(`/sessions/${sessionId}/chat`, post({ ...body, appVersion: APP_VERSION })),
   videos: () => request<VideoInfo[]>('/videos'),
+  models: () => request<ModelSettings>('/models'),
+  setModels: (change: { chatbot?: string; router?: string }) =>
+    request<ModelSettings>('/models', { method: 'PUT', body: JSON.stringify(change) }),
   examSections: () => request<ExamSectionInfo[]>('/exam'),
   examPaper: (section: ExamSection) => request<ExamPaper>(`/exam/${section}`),
   gradeExam: (section: ExamSection, answers: Record<string, number>) =>

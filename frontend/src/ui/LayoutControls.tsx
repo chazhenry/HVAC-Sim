@@ -19,6 +19,7 @@ import {
   useWindowWidth,
 } from "./layoutHooks";
 import { AudioSettings } from "./AudioSettings";
+import { ModelSettings } from "./ModelSettings";
 import { useControls } from "../store/useControls";
 
 /** A pushpin: pinned elements stay in their column or row; unpinned ones open from a button. */
@@ -455,7 +456,9 @@ export function LayoutPanel(): ReactNode {
     open: show,
   } = useLayout.getState();
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"layout" | "display" | "audio">("layout");
+  const [tab, setTab] = useState<"layout" | "display" | "audio" | "models">(
+    "layout",
+  );
   const wheelDownZoomsIn = useControls((s) => s.wheelDownZoomsIn);
   const setWheelDownZoomsIn = useControls((s) => s.setWheelDownZoomsIn);
   const file = useRef<HTMLInputElement>(null);
@@ -488,7 +491,7 @@ export function LayoutPanel(): ReactNode {
         role="tablist"
         aria-label="Settings sections"
       >
-        {(["layout", "display", "audio"] as const).map((id) => (
+        {(["layout", "display", "audio", "models"] as const).map((id) => (
           <button
             key={id}
             type="button"
@@ -502,11 +505,14 @@ export function LayoutPanel(): ReactNode {
               ? "Layout"
               : id === "display"
                 ? "Interface"
-                : "Audio"}
+                : id === "audio"
+                  ? "Audio"
+                  : "Models"}
           </button>
         ))}
       </div>
       {tab === "audio" && <AudioSettings />}
+      {tab === "models" && <ModelSettings />}
       {tab === "display" && (
         <section
           id="settings-display"

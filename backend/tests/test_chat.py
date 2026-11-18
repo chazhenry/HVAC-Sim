@@ -21,7 +21,7 @@ def sent(monkeypatch: pytest.MonkeyPatch) -> list[list[dict[str, str]]]:
     """Replace the LLM call and record what would have been sent."""
     calls: list[list[dict[str, str]]] = []
 
-    async def fake(messages: list[dict[str, str]]) -> tuple[str, str]:
+    async def fake(messages: list[dict[str, str]], model: str | None = None) -> tuple[str, str]:
         calls.append(messages)
         return "Check for 240 V at the contactor line side.", "fake"
 
@@ -85,7 +85,7 @@ def test_chat_is_capped_per_session(client: TestClient, sent: list[Any], monkeyp
 
 
 def test_chat_reports_missing_keys(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(llm, "providers", lambda: [])
+    monkeypatch.setattr(llm, "providers", lambda preferred=None: [])
     sid = session(client)
     res = client.post(f"/api/sessions/{sid}/chat", json={"message": "hi", "state": {}})
     assert res.status_code == 503

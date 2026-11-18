@@ -1500,11 +1500,32 @@ h2 {
 
 /* ---------- collapsible card header ---------- */
 
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Small icon buttons in a card header, e.g. Save configuration JSON. */
+.card-action {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 3px;
+  margin: -4px 0;
+}
+
+.card-toggle.card-chev {
+  flex: none;
+  width: auto;
+  align-self: stretch;
+}
+
 .card-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: none;

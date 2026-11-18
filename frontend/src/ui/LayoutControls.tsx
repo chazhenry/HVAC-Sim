@@ -12,7 +12,12 @@ import {
 import { useSim } from "../store/useSim";
 import { api } from "../api/client";
 import { ThermostatDialog } from "./Thermostat";
-import { useCoarsePointer, useDictationNotices, useJobViews, useWindowWidth } from "./layoutHooks";
+import {
+  useCoarsePointer,
+  useDictationNotices,
+  useJobViews,
+  useWindowWidth,
+} from "./layoutHooks";
 import { AudioSettings } from "./AudioSettings";
 import { useControls } from "../store/useControls";
 
@@ -493,7 +498,11 @@ export function LayoutPanel(): ReactNode {
             aria-controls={`settings-${id}`}
             onClick={() => setTab(id)}
           >
-            {id === "layout" ? "Layout" : id === "display" ? "Display" : "Audio"}
+            {id === "layout"
+              ? "Layout"
+              : id === "display"
+                ? "Interface"
+                : "Audio"}
           </button>
         ))}
       </div>
@@ -536,8 +545,8 @@ export function LayoutPanel(): ReactNode {
                 <span>
                   <strong>Roll the mouse wheel down to zoom in</strong>
                   <small>
-                    Off: roll up (away from you) to zoom in, as most 3D apps
-                    do. On: the reverse.
+                    Off: roll up (away from you) to zoom in, as most 3D apps do.
+                    On: the reverse.
                   </small>
                 </span>
               </label>

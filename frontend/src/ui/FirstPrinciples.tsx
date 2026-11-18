@@ -12,7 +12,27 @@ const VideoIcon = (): ReactNode => (
   </svg>
 );
 
-const megabytes = (bytes: number): string => `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`;
+/** Runtime as m:ss, or h:mm:ss for an hour or more, e.g. 6:32. */
+export function runtime(seconds: number): string {
+  const total = Math.round(seconds);
+  const [h, m, s] = [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60];
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+/** The video's runtime, read from its metadata; blank until it loads or if it cannot be read. */
+function Runtime({ url }: { url: string }): ReactNode {
+  const [seconds, setSeconds] = useState<number | null>(null);
+  useEffect(() => {
+    const probe = document.createElement('video');
+    probe.preload = 'metadata';
+    probe.muted = true;
+    probe.onloadedmetadata = () => { if (Number.isFinite(probe.duration)) setSeconds(probe.duration); };
+    probe.src = apiUrl(url);
+    return () => { probe.onloadedmetadata = null; probe.removeAttribute('src'); probe.load(); };
+  }, [url]);
+  return <span className="video-list-size">{seconds === null ? '' : runtime(seconds)}</span>;
+}
 
 /** A modal <dialog>, opened on mount. Escape or the Close button calls onClose. */
 function Modal({ className, labelId, onClose, children }: {
@@ -62,7 +82,7 @@ function VideoMenu(): ReactNode {
               <button type="button" onClick={() => play(video)}>
                 <span className="video-list-icon"><VideoIcon /></span>
                 <span className="video-list-title">{video.title}</span>
-                <span className="video-list-size">{megabytes(video.sizeBytes)}</span>
+                <Runtime url={video.url} />
               </button>
             </li>
           ))}

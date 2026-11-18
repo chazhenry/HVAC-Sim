@@ -1284,8 +1284,11 @@ h2 {
   padding: 0;
   gap: 0;
   flex: 1 1 0;
-  min-height: 250px;
-  overflow: hidden;
+  /* Never shorter than its contents (tabs + padding + the chat's minimum below), so the work order
+     scrolls instead of the chat input being cut off. "clip", not "hidden": a scroll container's
+     automatic minimum height is 0, which is what let the input be clipped. */
+  min-height: auto;
+  overflow: clip;
 }
 
 .tabs {
@@ -1320,7 +1323,7 @@ h2 {
 
 .tab-body {
   flex: 1;
-  min-height: 0;
+  min-height: auto;
   display: flex;
   flex-direction: column;
   padding: 10px 12px;
@@ -1336,7 +1339,7 @@ h2 {
 
 .chat {
   flex: 1;
-  min-height: 0;
+  min-height: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1344,7 +1347,7 @@ h2 {
 
 .chat-stream {
   flex: 1;
-  min-height: 120px;
+  min-height: 72px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1390,6 +1393,7 @@ h2 {
 
 .chat-input {
   position: relative;
+  flex: none;
 }
 
 .chat-input textarea {

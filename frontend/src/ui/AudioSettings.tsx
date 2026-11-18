@@ -1,8 +1,48 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
+import { englishVoices, savedVoiceName, setVoiceName, speakName, speechSupported } from '../audio/speech';
 import { playTone, TONE_NAMES, type ToneId } from '../audio/tones';
 import { CUES, useAudio } from '../store/useAudio';
 
 const TONES = Object.keys(TONE_NAMES) as ToneId[];
+
+/** The browser's English voices, refreshed when it finishes loading them (Chrome loads them late). */
+function useVoices(): SpeechSynthesisVoice[] {
+  const [voices, setVoices] = useState(englishVoices);
+  useEffect(() => {
+    if (!speechSupported()) return;
+    const update = (): void => setVoices(englishVoices());
+    window.speechSynthesis.addEventListener('voiceschanged', update);
+    update();
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', update);
+  }, []);
+  return voices;
+}
+
+/** The Speak tool's voice, with a button to hear it. */
+function VoicePicker({ volume }: { volume: number }): ReactNode {
+  const voices = useVoices();
+  const [name, setName] = useState(savedVoiceName() ?? '');
+  if (!speechSupported()) return null;
+  const sample = (): void => { speakName('Contactor L1 (line)', volume); };
+  return (
+    <fieldset className="audio-cues">
+      <legend>Speak tool voice</legend>
+      <div className="audio-cue">
+        <label htmlFor="speak-voice">Voice</label>
+        <select id="speak-voice" value={name} onChange={(event) => {
+          setName(event.target.value);
+          setVoiceName(event.target.value || null);
+          sample();
+        }}>
+          <option value="">Automatic ({voices[0]?.name ?? 'browser default'})</option>
+          {voices.map((v) => <option key={v.voiceURI} value={v.name}>{v.name} ({v.lang})</option>)}
+        </select>
+        <button type="button" className="icon-button" aria-label="Play the Speak tool voice" title="Play" onClick={sample}>▶</button>
+      </div>
+      <p className="fine">Voices come from your browser and operating system. Microsoft Edge offers the most natural ones.</p>
+    </fieldset>
+  );
+}
 
 /** Settings > Audio: sound on/off, volume, and the tone for each success or fail moment. */
 export function AudioSettings(): ReactNode {
@@ -41,6 +81,7 @@ export function AudioSettings(): ReactNode {
           ))}
         </fieldset>
       ))}
+      <VoicePicker volume={volume} />
       <div className="layout-actions">
         <button type="button" className="ghost" onClick={resetTones}>Reset sounds to defaults</button>
       </div>

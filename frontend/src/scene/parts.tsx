@@ -348,6 +348,74 @@ const LABEL_STYLE: CSSProperties = {
   transform: 'translateY(-14px)',
 };
 
+// No environment map in the scene, so a little emissive keeps fully metallic parts from going dark grey.
+const CHROME = { color: '#eef1f3', metalness: 0.75, roughness: 0.2, emissive: '#2e3236' } as const;
+
+/**
+ * A discharge-lead alligator clip biting a terminal at the origin, pointing up +Y:
+ * chrome toothed jaws pinched on the terminal, a chrome hinge and squeeze levers,
+ * then the red or black insulating boot and the lead's sleeve.
+ */
+function AlligatorClip({ color }: { color: 'red' | 'black' }): ReactNode {
+  const boot = color === 'red' ? '#d32f2f' : '#151515';
+  const sleeve = color === 'red' ? '#b71c1c' : '#0b0b0b';
+  // One side of the clip; side = 1 or -1 mirrors it across the jaw gap (along X, so the
+  // open V reads from the front and from above).
+  const tilt = (side: 1 | -1, angle: number): THREE.EulerTuple => [0, 0, -side * angle];
+  const half = (side: 1 | -1): ReactNode => (
+    <group key={side}>
+      {/* Jaw: tip pinches the terminal, widening slightly toward the hinge. */}
+      <mesh position={[side * 0.0052, 0.011, 0]} rotation={tilt(side, 0.14)}>
+        <boxGeometry args={[0.0014, 0.024, 0.0085]} />
+        <meshStandardMaterial {...CHROME} />
+      </mesh>
+      {/* Side flanges that give a stamped jaw its channel shape. */}
+      {[-1, 1].map((edge) => (
+        <mesh key={edge} position={[side * 0.0041, 0.011, edge * 0.0039]} rotation={tilt(side, 0.14)}>
+          <boxGeometry args={[0.0022, 0.024, 0.0008]} />
+          <meshStandardMaterial {...CHROME} />
+        </mesh>
+      ))}
+      {/* Teeth along the biting end. */}
+      {[0.0012, 0.0042, 0.0072].map((y) => (
+        <mesh key={y} position={[side * (0.0034 + y * 0.14), y, 0]} rotation={tilt(side, 0.14)}>
+          <boxGeometry args={[0.0016, 0.0011, 0.0075]} />
+          <meshStandardMaterial {...CHROME} />
+        </mesh>
+      ))}
+      {/* Squeeze lever past the hinge, flaring outward under the boot. */}
+      <mesh position={[side * 0.0078, 0.03, 0]} rotation={tilt(side, -0.3)}>
+        <boxGeometry args={[0.0013, 0.014, 0.0085]} />
+        <meshStandardMaterial {...CHROME} />
+      </mesh>
+    </group>
+  );
+  return (
+    <group>
+      {half(1)}
+      {half(-1)}
+      {/* Hinge pin and coil spring, across the jaws. */}
+      <mesh position={[0, 0.0235, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.0012, 0.0012, 0.0105, 10]} />
+        <meshStandardMaterial {...CHROME} />
+      </mesh>
+      <mesh position={[0, 0.0235, 0]}>
+        <torusGeometry args={[0.0026, 0.0007, 6, 14]} />
+        <meshStandardMaterial {...CHROME} />
+      </mesh>
+      {/* Coloured insulating boot over the levers, then the lead. */}
+      <mesh position={[0, 0.04, 0]}>
+        <cylinderGeometry args={[0.0058, 0.0072, 0.024, 12]} />
+        <meshStandardMaterial color={boot} roughness={0.45} />
+      </mesh>
+      <mesh position={[0, 0.067, 0]}>
+        <cylinderGeometry args={[0.0042, 0.0058, 0.03, 10]} />
+        <meshStandardMaterial color={sleeve} roughness={0.6} />
+      </mesh>
+    </group>
+  );
+}
+
 /** A probe-able terminal. Only rendered while its enclosure is open. */
 export function TestPoint({ id }: { id: AnyTestPointId }): ReactNode {
   const def = pointInfo(id);
@@ -399,15 +467,7 @@ export function TestPoint({ id }: { id: AnyTestPointId }): ReactNode {
           rotation={rotation}
           {...interactive(`${clip === 'red' ? 'Red' : 'Black'} discharge clip on: ${def.label}`, () => useSim.getState().probe(id))}
         >
-          {/* Alligator jaws on the terminal, then the insulating sleeve. */}
-          <mesh position={[0, 0.016, 0]}>
-            <boxGeometry args={[0.012, 0.03, 0.006]} />
-            <meshStandardMaterial color={clip === 'red' ? '#d32f2f' : '#151515'} roughness={0.45} />
-          </mesh>
-          <mesh position={[0, 0.05, 0]}>
-            <cylinderGeometry args={[0.0055, 0.0055, 0.04, 10]} />
-            <meshStandardMaterial color={clip === 'red' ? '#b71c1c' : '#0b0b0b'} roughness={0.6} />
-          </mesh>
+          <AlligatorClip color={clip} />
         </group>
       )}
       {ncvHere && (

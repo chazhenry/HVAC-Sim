@@ -401,14 +401,28 @@ export function meterSizeFor(tool: string): { width: number; height: number; hot
 /** On-screen size and hot spot (the clip's jaws, centred) of the 64 × 120 drawing, shown at 3/4 size. */
 export const DISCHARGE_SIZE = { width: 48, height: 90, hotX: 24, hotY: 2.25 } as const;
 
-/** One alligator clip on its lead: jaws at the top (tip at x, top), ribbed boot, then the cord down to a post. */
+/** Chrome gradient for the clip jaws; referenced as url(#chrome). */
+const CHROME_DEFS =
+  `<defs><linearGradient id="chrome" x1="0" x2="1"><stop offset="0" stop-color="#7d858c"/>` +
+  `<stop offset="0.35" stop-color="#f7f9fa"/><stop offset="0.6" stop-color="#c3c9ce"/><stop offset="1" stop-color="#6c737a"/></linearGradient></defs>`;
+
+/**
+ * One alligator clip on its lead: chrome toothed jaws at the top (tip at x, top) with a hinge,
+ * then the coloured sleeve and ribbed boot, then the cord down to a post. Needs CHROME_DEFS.
+ */
 function alligator(x: number, top: number, color: string, edge: string, postX: number): string {
+  const teeth = [3, 6, 9, 12]
+    .map((y) => `<path d="M${x - 0.6} ${top + y}l-1.6 1.2 1.6 1.2M${x + 0.6} ${top + y}l1.6 1.2-1.6 1.2" fill="none" stroke="#3b4147" stroke-width="0.6"/>`)
+    .join('');
   return (
     // Cord from the boot down to its post on the box.
     `<path d="M${x} ${top + 52}C${x} ${top + 66} ${postX} ${top + 64} ${postX} ${top + 76}" fill="none" stroke="${color}" stroke-width="2.6"/>` +
-    // Jaws: two tapered halves meeting at the tip, with teeth.
-    `<path d="M${x - 1.5} ${top}L${x - 6} ${top + 16}h12L${x + 1.5} ${top}z" fill="${color}" stroke="${edge}" stroke-width="0.9"/>` +
-    `<path d="M${x} ${top + 2}v12" stroke="${edge}" stroke-width="0.8" stroke-dasharray="1 1.4"/>` +
+    // Chrome jaws: two tapered halves meeting at the tip with a slit between, teeth along the slit.
+    `<path d="M${x - 0.4} ${top}L${x - 1.8} ${top}L${x - 6.5} ${top + 17}h6.1z" fill="url(#chrome)" stroke="#4c5258" stroke-width="0.8"/>` +
+    `<path d="M${x + 0.4} ${top}L${x + 1.8} ${top}L${x + 6.5} ${top + 17}h-6.1z" fill="url(#chrome)" stroke="#4c5258" stroke-width="0.8"/>` +
+    teeth +
+    // Hinge rivet where the jaws meet the sleeve.
+    `<circle cx="${x}" cy="${top + 14.5}" r="1.6" fill="#e9edf0" stroke="#4c5258" stroke-width="0.6"/>` +
     // Insulating sleeve with a lip, then the ribbed boot.
     `<path d="M${x - 6} ${top + 16}h12l-1.5 14h-9z" fill="${color}" stroke="${edge}" stroke-width="0.9"/>` +
     `<rect x="${x - 3.5}" y="${top + 30}" width="7" height="22" rx="2" fill="${color}" stroke="${edge}" stroke-width="0.9"/>` +
@@ -423,6 +437,7 @@ function alligator(x: number, top: number, color: string, edge: string, postX: n
 export function dischargeImage(next: 'black' | 'red' = 'black'): string {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="120" viewBox="0 0 64 120">` +
+    CHROME_DEFS +
     (next === 'red' ? alligator(32, 1, '#d32f2f', '#7f1010', 22) : alligator(32, 1, '#1d1d1f', '#000', 42)) +
     // Binding posts.
     `<ellipse cx="22" cy="80" rx="5" ry="2" fill="#a51d1d" stroke="#5c0d0d" stroke-width="0.8"/>` +
